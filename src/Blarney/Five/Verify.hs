@@ -81,7 +81,6 @@ makeGoldenExecUnit initPC instrLen = do
   return
     ExecUnit {
       issue = \instr s -> do
-        display "exec" instr.uid
         -- Check that correct instruction has been supplied
         assert (instr.uid .==. s.pc.val) "Instruction correct"
 
@@ -129,6 +128,7 @@ makePipelineVerifier = do
     , makeBranchPred = makeNaivePredictor 1
     , makeRegFile    = makeBasicRegFile instrSet
     }
+  return ()
 
 verify :: IO ()
 verify = do

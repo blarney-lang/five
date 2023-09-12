@@ -14,6 +14,10 @@ import Blarney.Five.Interface
 -- =============
 
 -- Create pipeline state
+makeState ::
+  (KnownNat xlen, Bits instr, Bits mreq) =>
+       PipelineParams xlen ilen instr lregs mreq
+    -> Module (PipelineState xlen instr)
 makeState p = do
   decActive      <- makeReg false
   decPC          <- makeReg dontCare
@@ -36,8 +40,8 @@ makeState p = do
   wbResult       <- makeReg dontCare
   return (PipelineState {..})
 
--- Pipeline stage
--- ==============
+-- Pipeline stages
+-- ===============
 
 -- Each pipeline stage has the following type
 type PipelineStage xlen ilen instr lregs mreq =
@@ -47,8 +51,6 @@ type PipelineStage xlen ilen instr lregs mreq =
     -> Module ()
 
 -- Stage 1: instruction fetch
--- ==========================
-
 fetch :: PipelineStage xlen ilen instr lregs mreq
 fetch p s = do
   -- Create branch target predictor
@@ -69,8 +71,6 @@ fetch p s = do
        branchPred.predict fetchPC
 
 -- Stage 2: instruction decode & operand fetch
--- ===========================================
-
 decode :: PipelineStage xlen ilen instr lregs mreq
 decode p s = do
   -- Create register file
@@ -94,8 +94,6 @@ decode p s = do
         when (inv regFile.stall) do p.imem.resps.consume
 
 -- Stage 3: execute
--- ================
-
 execute :: PipelineStage xlen ilen instr lregs mreq
 execute p s = do
   -- Create execution unit
@@ -135,8 +133,6 @@ execute p s = do
       s.memResult <== s.execResult.val
 
 -- Stage 4: memory access
--- ======================
-
 memAccess :: PipelineStage xlen ilen instr lregs mreq
 memAccess p s = do
   always do
@@ -158,14 +154,16 @@ memAccess p s = do
       else s.wbResult <== s.memResult.val
 
 -- Stage 5: writeback
--- ==================
-
 writeback :: PipelineStage xlen ilen instr lregs mreq
 writeback p s = return ()
 
 -- Classic 5-stage pipeline
 -- ========================
 
+makeClassic ::
+  (KnownNat xlen, Bits instr, Bits mreq) =>
+       PipelineParams xlen ilen instr lregs mreq
+    -> Module (PipelineState xlen instr)
 makeClassic p = do
   s <- makeState p
   fetch p s
@@ -173,3 +171,4 @@ makeClassic p = do
   execute p s
   memAccess p s
   writeback p s
+  return s

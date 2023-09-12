@@ -45,7 +45,7 @@ data ExecState xlen mreq =
   , operands :: [Bit xlen]
     -- Instruction result (write-only)
   , result :: WriteOnly (Bit xlen)
-    -- Optional memory request
+    -- Memory request (write-only)
   , memReq :: WriteOnly mreq
   }
 
@@ -97,7 +97,8 @@ data RF xlen instr =
     -- The instruction operands are available one cycle after
     -- submission and will remain stable until submit is called again.
   , operands :: [Bit xlen]
-    -- The register file can request a pipeline stall if the submitted
+    -- The register file can request a pipeline stall (on the same
+    -- cycle as an instruction submission) if the submitted
     -- instruction's operands are not yet available.
   , stall :: Bit 1
   }
