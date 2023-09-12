@@ -10,8 +10,8 @@ import Blarney.ClientServer
 import Blarney.Five.Util
 import Blarney.Five.Interface
 
--- Pipline state
--- =============
+-- Pipeline state
+-- ==============
 
 -- Create pipeline state
 makeState ::
