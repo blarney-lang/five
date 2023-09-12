@@ -1,0 +1,63 @@
+cabal-version: 3.0
+name: blarney-five
+version: 0.1.0.0
+
+flag enable-namer-plugin
+  description: Enable namer plugin
+  manual: True
+  default: False
+
+common blarney-five-common
+  default-language: GHC2021
+  default-extensions:
+    BlockArguments
+    DataKinds
+    DeriveAnyClass
+    DerivingStrategies
+    DuplicateRecordFields
+    MultiWayIf
+    NoImplicitPrelude
+    NoStarIsType
+    OverloadedRecordDot
+    OverloadedLabels
+    PartialTypeSignatures
+    RebindableSyntax
+    RecordWildCards
+    RecursiveDo
+    TypeFamilies
+    NoFieldSelectors
+  ghc-options:
+    -Wno-partial-type-signatures
+  if flag(enable-namer-plugin)
+    build-depends:
+      blarney-plugins-namer
+    ghc-options:
+      -fplugin BlarneyPlugins.Namer
+  build-depends:
+      base
+    , blarney
+
+library
+  import: blarney-five-common
+  hs-source-dirs: src
+  exposed-modules: Blarney.Five
+  other-modules:
+    Blarney.Five.Util
+    Blarney.Five.Verify
+    Blarney.Five.RegFile
+    Blarney.Five.Pipeline
+    Blarney.Five.Interface
+    Blarney.Five.BranchPred
+
+--executable blarney-five-gen
+--  import: blarney-five-common
+--  main-is: Main.hs
+--  hs-source-dirs: gen
+--  build-depends: blarney-five
+
+--test-suite blarney-five-tests
+--  import: blarney-five-common
+--  type: exitcode-stdio-1.0
+--  main-is: Tests.hs
+--  hs-source-dirs: tests
+--  build-depends: blarney-five
