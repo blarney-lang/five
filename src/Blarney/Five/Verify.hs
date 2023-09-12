@@ -110,6 +110,7 @@ makeGoldenExecUnit initPC instrLen = do
               andList [ r.valid .==>. (goldenRegs!r.val).val .==. o
                       | (r, o) <- zip [instr.rs1, instr.rs2] s.operands ]
         assert operandsOk "Operands correct"
+        return ()
     }
 
 -- Construct pipeline for verification
@@ -125,7 +126,7 @@ makePipelineVerifier = do
     , imem           = imem
     , dmem           = dmem
     , instrSet       = instrSet
-    , makeBranchPred = makeNaivePredictor 1
+    , makeBranchPred = makeArbitraryPredictor 1
     , makeRegFile    = makeBasicRegFile instrSet
     }
   return ()
