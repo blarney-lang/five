@@ -58,19 +58,26 @@ fetch p s = do
   -- Create branch target predictor
   branchPred <- p.makeBranchPred s
 
+  -- Have we seen a misprediction since the previous fetch?
+  seenMispred <- makeReg false
+
   always do
-    let fetchPC = if s.execMispredict.val
+    let fetchPC = if s.execMispredict.val .||. seenMispred.val
           then s.execExpectedPC.val
           else branchPred.out
-    -- Setup decode stage and issue imem request
+    -- Issue imem request
+    if inv s.decStall.val .&&. p.imem.reqs.canPut
+      then do
+        p.imem.reqs.put fetchPC
+        branchPred.predict fetchPC
+        seenMispred <== false
+      else do
+        when s.execMispredict.val do
+          seenMispred <== true
+    -- Setup decode stage
     when (inv s.decStall.val) do
       s.decActive <== p.imem.reqs.canPut
       s.decPC <== fetchPC
-      when p.imem.reqs.canPut do
-        p.imem.reqs.put fetchPC
-    -- Invoke branch target predictor
-    when (inv s.decStall.val .||. s.execMispredict.val) do
-       branchPred.predict fetchPC
 
 -- Stage 2: instruction decode & operand fetch
 -- ===========================================

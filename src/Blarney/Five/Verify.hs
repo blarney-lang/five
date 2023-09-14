@@ -110,8 +110,20 @@ makeGoldenExecUnit initPC instrLen = do
               andList [ r.valid .==>. (goldenRegs!r.val).val .==. o
                       | (r, o) <- zip [instr.rs1, instr.rs2] s.operands ]
         assert operandsOk "Operands correct"
-        return ()
     }
+
+-- Bounded number of consecutive branch mispredictions
+checkMispredsBounded s = do
+  -- The number of consecutive branch mispredictions
+  mispreds :: Reg (Bit 2) <- makeReg 0
+
+  always do
+    when (s.execActive.val .&&. inv s.execStall.val) do
+      if s.execMispredict.val
+        then mispreds <== mispreds.val + 1
+        else mispreds <== 0
+    assert (mispreds.val .<=. 2)
+           "Max of two consecutive branch mispredictions"
 
 -- Construct pipeline for verification
 makePipelineVerifier :: Module ()
@@ -119,7 +131,7 @@ makePipelineVerifier = do
   imem <- makeIdentityServer "imem"
   dmem <- makeIdentityServer "dmem"
   let instrSet = v_instrSet 0 1
-  makeClassic
+  s <- makeClassic
     PipelineParams {
       initPC         = 0
     , instrLen       = 1
@@ -129,6 +141,7 @@ makePipelineVerifier = do
     , makeBranchPred = makeArbitraryPredictor 1
     , makeRegFile    = makeBasicRegFile instrSet
     }
+  checkMispredsBounded s
   return ()
 
 verify :: IO ()
