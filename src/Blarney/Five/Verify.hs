@@ -186,8 +186,8 @@ makeCorrectnessVerifier = do
   checkMispredsBounded s
 
 -- Pipeline for forward progress verification
-makeForwardProgressVerifier :: Int -> Module ()
-makeForwardProgressVerifier d = do
+makeForwardProgressVerifier :: Int -> Int -> Module ()
+makeForwardProgressVerifier n d = do
     imem <- makeMapFilterServer true true (const true) id
     dmem <- makeMapFilterServer true true (.hasResp) (.uid)
     let instrSet = v_instrSet 0 1 False
@@ -201,7 +201,7 @@ makeForwardProgressVerifier d = do
       , makeBranchPred = makeArbitraryPredictor 1
       , makeRegFile    = makeBasicRegFile instrSet
       }
-    checkForwardProgress 2 (fromIntegral d) s
+    checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
 -- Generate SMT scripts for verification
 verify :: IO ()
@@ -210,7 +210,12 @@ verify = do
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
   writeSMTScript conf makeCorrectnessVerifier "Correctness" "SMT"
 
+  let d    = 10
+  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
+  writeSMTScript conf (makeForwardProgressVerifier 1 (d-1))
+                 "ForwardProgress1" "SMT"
+
   let d    = 18
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
-  writeSMTScript conf (makeForwardProgressVerifier (d-1))
-                 "ForwardProgress" "SMT"
+  writeSMTScript conf (makeForwardProgressVerifier 2 (d-1))
+                 "ForwardProgress2" "SMT"
