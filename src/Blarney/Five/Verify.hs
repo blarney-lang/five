@@ -1,3 +1,5 @@
+-- TODO: data memory needs to know difference between requests that
+-- require a response and those that don't
 module Blarney.Five.Verify where
 
 import Blarney
@@ -12,22 +14,43 @@ import Blarney.Five.Interface
 import Blarney.Five.BranchPred
 
 -- Type parameters for verification
-type V_XLen    = 4   -- Register width
-type V_ILen    = 4   -- Instruction width
-type V_LogRegs = 3   -- Log_2 of number of registers
+type V_XLen    = 3   -- Register width
+type V_ILen    = 3   -- Instruction width
+type V_LogRegs = 2   -- Log_2 of number of registers
 
--- The identity server simply consumes requests and sends them back again
--- as responses. It uses universally quantified put and peek masks to
--- capture arbitrary latency and backpressure. If the masks are always
--- true, the server is capable of operating at full throughput, consuming
--- a request and producing a response on every cycle. The number of
--- outstanding requests is controlled by the size of the internal queue.
-makeIdentityServer :: Bits a => Bit 1 -> Bit 1 -> Module (Server a a)
-makeIdentityServer putMask peekMask = do
+-- Memory request type for verification
+data V_MemReq =
+  V_MemReq {
+    -- Unique request id
+    uid :: Bit V_XLen
+  , -- Do we expect a response from this request?
+    hasResp :: Bit 1
+  }
+  deriving (Generic, Bits)
+
+-- The map-filter server consumes requests, filters out requests that
+-- don't match a given predicate, applies a given function to convert a
+-- request into a response, and returns back the responses.  It uses
+-- universally quantified put and peek masks to capture arbitrary latency
+-- and backpressure. If the masks are always true, the server is capable
+-- of operating at full throughput, consuming a request and producing a
+-- response on every cycle. The number of outstanding requests is
+-- controlled by the size of the internal queue.
+makeMapFilterServer :: (Bits req, Bits resp)
+                    => Bit 1 -> Bit 1
+                    -> (req -> Bit 1)
+                    -> (req -> resp)
+                    -> Module (Server req resp)
+makeMapFilterServer putMask peekMask p f = do
   q <- makePipelineQueue 1
   return
     Server {
-      reqs  = limitSink putMask (toSink q)
+      reqs  = limitSink putMask $
+                Sink {
+                  canPut = q.notFull
+                , put = \req -> when (p req :: Bit 1) do
+                                  q.enq (f req)
+                }
     , resps = limitSource peekMask (toSource q)
     }
 
@@ -69,7 +92,7 @@ v_instrSet initPC instrLen enAsserts =
 
 -- Execution unit for verification
 makeGoldenExecUnit :: Bit V_XLen -> Bit V_XLen -> Bool ->
-  Module (ExecUnit V_XLen V_Instr (Bit V_XLen))
+  Module (ExecUnit V_XLen V_Instr V_MemReq)
 makeGoldenExecUnit initPC instrLen enAsserts = do
   goldenPC   <- makeReg initPC
   goldenRegs <- replicateM (2 ^ valueOf @V_LogRegs) (makeReg 0)
@@ -85,7 +108,7 @@ makeGoldenExecUnit initPC instrLen enAsserts = do
         -- Issue memory request
         let req = var "req"
         when instr.isMemAccess do
-          s.memReq <== req
+          s.memReq <== V_MemReq { uid = req, hasResp = instr.rd.valid }
 
         -- Optionally perform a branch
         let branch = Option (var "branch_valid") (var "branch")
@@ -143,10 +166,12 @@ checkForwardProgress n t s = do
 -- Pipeline for correctness verification
 makeCorrectnessVerifier :: Module ()
 makeCorrectnessVerifier = do
-  imem <- makeIdentityServer (var "imem_put_mask")
-                             (var "imem_peek_mask")
-  dmem <- makeIdentityServer (var "dmem_put_mask")
-                             (var "dmem_peek_mask")
+  imem <- makeMapFilterServer (var "imem_put_mask")
+                              (var "imem_peek_mask")
+                              (const true) id
+  dmem <- makeMapFilterServer (var "dmem_put_mask")
+                              (var "dmem_peek_mask")
+                              (.hasResp) (.uid)
   let instrSet = v_instrSet 0 1 True
   s <- makeClassic
     PipelineParams {
@@ -163,8 +188,8 @@ makeCorrectnessVerifier = do
 -- Pipeline for forward progress verification
 makeForwardProgressVerifier :: Int -> Module ()
 makeForwardProgressVerifier d = do
-    imem <- makeIdentityServer true true
-    dmem <- makeIdentityServer true true
+    imem <- makeMapFilterServer true true (const true) id
+    dmem <- makeMapFilterServer true true (.hasResp) (.uid)
     let instrSet = v_instrSet 0 1 False
     s <- makeClassic
       PipelineParams {
@@ -176,16 +201,16 @@ makeForwardProgressVerifier d = do
       , makeBranchPred = makeArbitraryPredictor 1
       , makeRegFile    = makeBasicRegFile instrSet
       }
-    checkForwardProgress 1 (fromIntegral d) s
+    checkForwardProgress 2 (fromIntegral d) s
 
 -- Generate SMT scripts for verification
 verify :: IO ()
 verify = do
-  let d    = 5
+  let d    = 7
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
   writeSMTScript conf makeCorrectnessVerifier "Correctness" "SMT"
 
-  let d    = 10
+  let d    = 18
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
   writeSMTScript conf (makeForwardProgressVerifier (d-1))
                  "ForwardProgress" "SMT"
