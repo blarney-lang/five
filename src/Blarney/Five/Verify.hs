@@ -1,5 +1,3 @@
--- TODO: data memory needs to know difference between requests that
--- require a response and those that don't
 module Blarney.Five.Verify where
 
 import Blarney
@@ -43,22 +41,11 @@ makeMapFilterServer :: (Bits req, Bits resp)
                     -> Module (Server req resp)
 makeMapFilterServer putMask peekMask p f = do
   q <- makePipelineQueue 1
-  return
-    Server {
-      reqs  = limitSink putMask $
-                Sink {
-                  canPut = q.notFull
-                , put = \req -> when (p req :: Bit 1) do
-                                  q.enq (f req)
-                }
-    , resps = limitSource peekMask (toSource q)
-    }
-
-limitSink :: Bit 1 -> Sink a -> Sink a
-limitSink putMask s = s { canPut = s.canPut .&&. putMask }
-
-limitSource :: Bit 1 -> Source a -> Source a
-limitSource peekMask s = s { canPeek = s.canPeek .&&. peekMask }
+  let src = toSource q
+  let snk = Sink { canPut = q.notFull .&&. putMask
+                 , put = \req ->
+                     when (p req) do q.enq (f req) }
+  return (Server snk src)
 
 -- Instruction format for verification
 data V_Instr =
