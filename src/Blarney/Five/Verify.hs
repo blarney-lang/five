@@ -16,13 +16,17 @@ type V_XLen    = 3   -- Register width
 type V_ILen    = 3   -- Instruction width
 type V_LogRegs = 2   -- Log_2 of number of registers
 
+-- Number of source operands per instruction
+numSrcs :: Int
+numSrcs = 2
+
 -- Memory request type for verification
 data V_MemReq =
   V_MemReq {
     -- Unique request id
     uid :: Bit V_XLen
-  , -- Do we expect a response from this request?
-    hasResp :: Bit 1
+    -- Do we expect a response from this request?
+  , hasResp :: Bit 1
   }
   deriving (Generic, Bits)
 
@@ -62,7 +66,7 @@ data V_Instr =
 v_instrSet initPC instrLen enAsserts =
   InstrSet {
     numRegs     = 2 ^ valueOf @V_LogRegs
-  , numSrcs     = 2
+  , numSrcs     = numSrcs
   , getDest     = \i -> i.rd
   , getSrcs     = \i -> [i.rs1, i.rs2]
   , isMemAccess = \i -> i.isMemAccess
@@ -168,7 +172,7 @@ makeCorrectnessVerifier = do
     , dmem           = dmem
     , instrSet       = instrSet
     , makeBranchPred = makeArbitraryPredictor 1
-    , makeRegFile    = makeBasicRegFile instrSet
+    , makeRegFile    = makeBasicRegFile (makeRegMem numSrcs) instrSet
     }
   checkMispredsBounded s
 
@@ -186,7 +190,7 @@ makeForwardProgressVerifier n d = do
       , dmem           = dmem
       , instrSet       = instrSet
       , makeBranchPred = makeArbitraryPredictor 1
-      , makeRegFile    = makeBasicRegFile instrSet
+      , makeRegFile    = makeBasicRegFile (makeRegMem numSrcs) instrSet
       }
     checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
