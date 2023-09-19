@@ -45,7 +45,9 @@ makeMapFilterServer :: (Bits req, Bits resp)
                     -> Module (Server req resp)
 makeMapFilterServer putMask peekMask p f = do
   q <- makePipelineQueue 1
-  let src = toSource q
+  let src = Source { canPeek = q.canDeq .&&. peekMask
+                   , peek    = q.first
+                   , consume = q.deq }
   let snk = Sink { canPut = q.notFull .&&. putMask
                  , put = \req ->
                      when (p req) do q.enq (f req) }
