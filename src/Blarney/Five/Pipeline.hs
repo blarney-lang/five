@@ -30,6 +30,7 @@ makeState p = do
   execExpectedPC <- makeReg p.initPC
   execStall      <- makeWire false
   execResult     <- makeWire dontCare
+  execBranch     <- makeWire dontCare
   memActive      <- makeReg false
   memInstr       <- makeReg dontCare
   memResult      <- makeReg dontCare
@@ -112,7 +113,6 @@ execute p s = do
   execUnit <- p.instrSet.makeExecUnit
 
   -- Wires for communicating with execution unit
-  nextPC <- makeWire (s.execPC.val + p.instrLen)
   memReq <- makeWire dontCare
 
   always do
@@ -131,12 +131,13 @@ execute p s = do
     when fire do
       execUnit.issue s.execInstr.val
         ExecState {
-          pc       = ReadWrite s.execPC.val (nextPC <==)
+          pc       = ReadWrite s.execPC.val (s.execBranch <==)
         , operands = map (.val) s.execOperands
         , result   = WriteOnly (s.execResult <==)
         , memReq   = WriteOnly (memReq <==)
         }
-      s.execExpectedPC <== nextPC.val
+      s.execExpectedPC <== if s.execBranch.active
+        then s.execBranch.val else s.execPC.val + p.instrLen
       when isMemAccess do p.dmem.reqs.put memReq.val
     -- Setup memory access stage
     when (inv s.memStall.val) do

@@ -37,3 +37,51 @@ makeArbitraryPredictor instrLen s = do
       predict = \fetchPC -> return ()
     , out = var "predicted_pc"
     }
+
+-- Branch target predictor using BTB
+-- =================================
+
+-- Entry in the branch target buffer (BTB)
+data BTBEntry xlen =
+  BTBEntry {
+    -- Valid entry?
+    valid :: Bit 1
+    -- Progam counter
+  , pc :: Bit xlen
+    -- Branch target for this PC
+  , target :: Bit xlen
+  }
+  deriving (Generic, Bits)
+
+-- Create BTB-based predictor using BTB with 2^n entries
+makeBTBPredictor :: forall n xlen mreq.
+     (KnownNat n, KnownNat xlen, n <= xlen)
+  => Bit xlen
+  -> PipelineState xlen mreq
+  -> Module (BranchPred xlen)
+makeBTBPredictor instrLen s = do
+  -- Branch target buffer
+  btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
+
+  -- BTB entry being looked up
+  lookup <- makeReg dontCare
+
+  -- Update BTB
+  always do
+    when s.execBranch.active do
+      btb.store (truncate s.execPC.val)
+        BTBEntry {
+          valid = true
+        , pc = s.execPC.val
+        , target = s.execBranch.val
+        }
+
+  return
+    BranchPred {
+      predict = \fetchPC -> do
+        btb.load (truncate fetchPC)
+        lookup <== fetchPC
+    , out = if btb.out.valid .&&. btb.out.pc .==. lookup.val
+              then btb.out.target
+              else lookup.val + instrLen
+    }

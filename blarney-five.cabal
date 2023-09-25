@@ -10,6 +10,7 @@ flag enable-namer-plugin
 common blarney-five-common
   default-language: GHC2021
   default-extensions:
+    AllowAmbiguousTypes
     BlockArguments
     DataKinds
     DeriveAnyClass

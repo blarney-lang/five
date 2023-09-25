@@ -130,6 +130,8 @@ data PipelineState xlen instr =
   , execStall :: Wire (Bit 1)
     -- Instruction result
   , execResult :: Wire (Bit xlen)
+    -- Branch target of executed instruction
+  , execBranch :: Wire (Bit xlen)
     -- Is the memory access stage active?
   , memActive :: Reg (Bit 1)
     -- If so, the instruction and its result
