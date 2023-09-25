@@ -72,10 +72,9 @@ data V_Instr =
 -- Instruction set interface for verification
 v_instrSet initPC instrLen enAsserts =
   InstrSet {
-    numRegs     = 2 ^ valueOf @V_LogRegs
-  , numSrcs     = numSrcs
-  , getDest     = \i -> i.rd
+    getDest     = \i -> i.rd
   , getSrcs     = \i -> [i.rs1, i.rs2]
+  , numSrcs     = numSrcs
   , isMemAccess = \i -> i.isMemAccess
   , decode      = \uid ->
       V_Instr {

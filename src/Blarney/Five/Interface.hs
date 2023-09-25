@@ -14,15 +14,13 @@ import Blarney.ClientServer
 -- registers (2^lregs), and the data memory request format (mreq).
 data InstrSet xlen ilen instr lregs mreq =
   InstrSet {
-    -- Number of registers
-    numRegs :: Int
-    -- Number of source operands
-  , numSrcs :: Int
     -- Instruction decoder
-  , decode :: Bit ilen -> instr
+    decode :: Bit ilen -> instr
     -- Extract source/destination registers from instruction
   , getDest :: instr -> Option (Bit lregs)
   , getSrcs :: instr -> [Option (Bit lregs)]
+    -- Max number of source operands per instruction
+  , numSrcs :: Int
     -- Will instruction issue a data memory request?
   , isMemAccess :: instr -> Bit 1
     -- Execution unit (instruction semantics)
