@@ -30,7 +30,7 @@ data InstrSet xlen ilen instr lregs mreq =
 -- Execution unit interface
 data ExecUnit xlen instr mreq =
   ExecUnit {
-    -- Execute given instruction in given state
+    -- Execute given instruction, reading/writing given state
     issue :: instr -> ExecState xlen mreq -> Action ()
   }
 
@@ -60,7 +60,7 @@ data PipelineParams xlen ilen instr lregs mreq =
     -- Interfaces to instruction and data memories
   , imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
-    -- Instruction set details
+    -- Instruction set definition
   , instrSet :: InstrSet xlen ilen instr lregs mreq
     -- Branch predictor module
   , makeBranchPred :: PipelineState xlen instr
