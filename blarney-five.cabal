@@ -44,6 +44,7 @@ library
   other-modules:
     Blarney.Five.Util
     Blarney.Five.Verify
+    Blarney.Five.RegMem
     Blarney.Five.RegFile
     Blarney.Five.Pipeline
     Blarney.Five.Interface

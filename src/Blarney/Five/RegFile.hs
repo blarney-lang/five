@@ -2,83 +2,20 @@ module Blarney.Five.RegFile where
 
 import Blarney
 import Blarney.Option
-import Blarney.Five.Util
+import Blarney.Five.RegMem
 import Blarney.Five.Interface
 
--- Register memory abstraction
--- ===========================
+-- Basic register file
+-- ===================
 
--- Register memory abstraction, parameterised by the number of
--- registers (2^lregs) and the register size (xlen).
-data RegMem lregs xlen =
-  RegMem {
-    -- Load each of the given operands
-    load  :: [Bit lregs] -> Action ()
-    -- Values loaded, valid one cycle after call to load and preserved
-    -- until load is called against.
-  , outs  :: [Bit xlen]
-    -- Overwrite value of given register with given value.
-  , store :: Bit lregs -> Bit xlen -> Action ()
-  }
-
--- Register memory using a list of registers
-makeRegMem :: forall lregs xlen. (KnownNat lregs, KnownNat xlen) =>
-  Int -> Module (RegMem lregs xlen)
-makeRegMem numReadPorts = do
-  -- Register array and operand latches
-  regs    <- replicateM (2 ^ valueOf @lregs) (makeReg 0)
-  latches <- replicateM numReadPorts (makeReg 0)
-
-  return
-    RegMem {
-      load = \rss ->
-        sequence_
-          [ latch <== (regs!r).val
-          | (latch, r) <- zip latches rss ]
-    , outs = map (.val) latches
-    , store = \r x ->
-        (regs!r) <== x
-    }
-
--- Register memory using onchip synchronous RAMs
-makeRegMemRAM :: (KnownNat lregs, KnownNat xlen) =>
-  Int -> Module (RegMem lregs xlen)
-makeRegMemRAM numReadPorts = do
-  -- Register RAM, one per read port
-  rams <- replicateM numReadPorts makeDualRAM
-
-  -- Read enable wire
-  readEnable <- makeWire false
-
-  always do
-    when (inv readEnable.val) do
-      sequence_ [ ram.preserveOut | ram <- rams ]
-
-  return
-    RegMem {
-      load = \rss -> do
-        sequence
-          [ ram.load r
-          | (ram, r) <- zip rams rss ]
-        readEnable <== true
-    , outs = map (.out) rams
-    , store = \r x ->
-        sequence_ [ ram.store r x | ram <- rams ]
-    }
-
--- Basic register file & scoreboard
--- ================================
-
--- Basic register file with scoreboard to handle data hazards
+-- Basic register file with data hazard detection/stall
 makeBasicRegFile :: (Bits instr, KnownNat xlen, KnownNat lregs)
-  => Module (RegMem lregs xlen)
+  => RegMem lregs xlen
   -> InstrSet xlen ilen instr lregs mreq
   -> PipelineState xlen instr
   -> Module (RF xlen instr)
-makeBasicRegFile makeRegMem instrSet s = do
-  regMem   <- makeRegMem
-  sboard   <- replicateM instrSet.numRegs (makeReg false)
-  stall    <- makeWire false
+makeBasicRegFile regMem instrSet s = do
+  stall <- makeWire false
 
   always do
     -- Monitor writeback stage and perform writes
@@ -86,25 +23,79 @@ makeBasicRegFile makeRegMem instrSet s = do
       let rd = instrSet.getDest s.wbInstr.val
       when rd.valid do
         regMem.store rd.val s.wbResult.val
-        sboard ! rd.val <== false
-    -- Handle mispredicted instructions
-    when s.execActive.val do
-      let rd = instrSet.getDest s.execInstr.val
-      when (s.execMispredict.val .&&. rd.valid) do
-        sboard ! rd.val <== false
 
   return
     RF {
       submit = \instr -> do
         -- Load operands
-        let rd = instrSet.getDest instr
         let rss = instrSet.getSrcs instr
         regMem.load (map (.val) rss)
-        -- Stall if registers locked
-        stall <== orList [ r.valid .&&. (sboard ! r.val).val
-                         | r <- rd:rss ]
-        -- Lock destination register
-        when (rd.valid .&&. inv stall.val) do sboard ! rd.val <== true
+        -- Stall if register file does not hold latest value
+        stall <== orList (map hazard rss)
     , operands = regMem.outs
     , stall = stall.val
     }
+
+  where
+    -- Is there a data hazard reading given register?
+    hazard reg = reg.valid .&&.
+         ( s.execActive.val .&&. s.execInstr `writes` reg.val
+      .||. s.memActive.val  .&&. s.memInstr  `writes` reg.val
+      .||. s.wbActive.val   .&&. s.wbInstr   `writes` reg.val )
+
+    -- Does given instruction write to given reg?
+    instr `writes` reg = rd.valid .&&. rd.val .==. reg
+      where rd = instrSet.getDest instr.val
+
+-- Forwarding register file
+-- ========================
+
+-- Forwarding register file with load hazard detection/stall
+makeForwardingRegFile :: (Bits instr, KnownNat xlen, KnownNat lregs)
+  => RegMem lregs xlen
+  -> InstrSet xlen ilen instr lregs mreq
+  -> PipelineState xlen instr
+  -> Module (RF xlen instr)
+makeForwardingRegFile regMem instrSet s = do
+  stall <- makeWire false
+
+  always do
+    -- Monitor writeback stage and perform writes
+    when s.wbActive.val do
+      let rd = instrSet.getDest s.wbInstr.val
+      when rd.valid do
+        regMem.store rd.val s.wbResult.val
+
+  return
+    RF {
+      submit = \instr -> do
+        -- Load operands
+        let rss = instrSet.getSrcs instr
+        regMem.load (map (.val) rss)
+        -- Stall if register file does not hold latest value
+        stall <== orList (map hazard rss)
+    , operands =
+        let rss = instrSet.getSrcs s.execInstr.val in
+          zipWith forward (map (.val) rss) regMem.outs
+    , stall = stall.val
+    }
+
+  where
+    -- Is there a data hazard reading given register?
+    hazard reg = reg.valid .&&.
+         ( s.execActive.val .&&. s.execInstr `loads` reg.val
+      .||. s.memActive.val  .&&. s.memInstr  `loads` reg.val )
+
+    -- Does given instruction write to given reg?
+    instr `writes` reg = rd.valid .&&. rd.val .==. reg
+      where rd = instrSet.getDest instr.val
+
+    -- Does given instruction load from memory into given reg?
+    instr `loads` reg = instrSet.isMemAccess instr.val .&&.
+                          instr `writes` reg
+
+    -- Get latest value of given register
+    forward reg fromRF =
+      if s.memActive.val .&&. s.memInstr `writes` reg then s.memResult.val
+        else if s.wbActive.val .&&. s.wbInstr `writes` reg then s.wbResult.val
+          else fromRF

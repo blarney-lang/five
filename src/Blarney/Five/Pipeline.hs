@@ -7,7 +7,6 @@ import Blarney
 import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
-import Blarney.Five.Util
 import Blarney.Five.Interface
 
 -- Pipeline state

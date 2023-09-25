@@ -6,6 +6,7 @@ import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
 import Blarney.Five.Util
+import Blarney.Five.RegMem
 import Blarney.Five.RegFile
 import Blarney.Five.Pipeline
 import Blarney.Five.Interface
@@ -19,6 +20,10 @@ type V_LogRegs = 2   -- Log_2 of number of registers
 -- Number of source operands per instruction
 numSrcs :: Int
 numSrcs = 2
+
+-- Enable register forwarding?
+enRegFwd :: Bool
+enRegFwd = True
 
 -- Memory request type for verification
 data V_MemReq =
@@ -165,6 +170,8 @@ makeCorrectnessVerifier = do
   dmem <- makeMapFilterServer (var "dmem_put_mask")
                               (var "dmem_peek_mask")
                               (.hasResp) (.uid)
+  rmem <- if enRegFwd then makeForwardingRegMem numSrcs
+                      else makeRegMem numSrcs
   let instrSet = v_instrSet 0 1 True
   s <- makeClassic
     PipelineParams {
@@ -174,7 +181,9 @@ makeCorrectnessVerifier = do
     , dmem           = dmem
     , instrSet       = instrSet
     , makeBranchPred = makeArbitraryPredictor 1
-    , makeRegFile    = makeBasicRegFile (makeRegMem numSrcs) instrSet
+    , makeRegFile    = if enRegFwd
+                         then makeForwardingRegFile rmem instrSet
+                         else makeBasicRegFile rmem instrSet
     }
   checkMispredsBounded s
 
@@ -183,6 +192,8 @@ makeForwardProgressVerifier :: Int -> Int -> Module ()
 makeForwardProgressVerifier n d = do
     imem <- makeMapFilterServer true true (const true) id
     dmem <- makeMapFilterServer true true (.hasResp) (.uid)
+    rmem <- if enRegFwd then makeForwardingRegMem numSrcs
+                        else makeRegMem numSrcs
     let instrSet = v_instrSet 0 1 False
     s <- makeClassic
       PipelineParams {
@@ -192,7 +203,9 @@ makeForwardProgressVerifier n d = do
       , dmem           = dmem
       , instrSet       = instrSet
       , makeBranchPred = makeArbitraryPredictor 1
-      , makeRegFile    = makeBasicRegFile (makeRegMem numSrcs) instrSet
+      , makeRegFile    = if enRegFwd
+                           then makeForwardingRegFile rmem instrSet
+                           else makeBasicRegFile rmem instrSet
       }
     checkForwardProgress (fromIntegral n) (fromIntegral d) s
 

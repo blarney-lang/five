@@ -10,7 +10,7 @@ import Blarney.ClientServer
 
 -- Information about the instruction set provided to the pipeline,
 -- parameterised by the register size in bits (xlen), instruction size in
--- bits (ilen), the decoded instruction format (instr), the number of
+-- bits (ilen), the decoded instruction format (instr), number of
 -- registers (2^lregs), and the data memory request format (mreq).
 data InstrSet xlen ilen instr lregs mreq =
   InstrSet {
@@ -23,7 +23,7 @@ data InstrSet xlen ilen instr lregs mreq =
     -- Extract source/destination registers from instruction
   , getDest :: instr -> Option (Bit lregs)
   , getSrcs :: instr -> [Option (Bit lregs)]
-    -- Does instruction access data memory?
+    -- Will instruction issue a data memory request?
   , isMemAccess :: instr -> Bit 1
     -- Execution unit (instruction semantics)
   , makeExecUnit :: Module (ExecUnit xlen instr mreq)
@@ -62,7 +62,7 @@ data PipelineParams xlen ilen instr lregs mreq =
     -- Interfaces to instruction and data memories
   , imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
-    -- Interface to instruction set
+    -- Instruction set details
   , instrSet :: InstrSet xlen ilen instr lregs mreq
     -- Branch predictor module
   , makeBranchPred :: PipelineState xlen instr
@@ -106,7 +106,7 @@ data RF xlen instr =
 -- Pipeline state
 -- ==============
 
--- Pipeline state parameterised by register size in bits (xlen),
+-- Pipeline state parameterised by register size in bits (xlen)
 -- and decoded instruction format (instr).
 data PipelineState xlen instr =
   PipelineState {
@@ -122,10 +122,10 @@ data PipelineState xlen instr =
   , execInstr :: Reg instr
   , execPC :: Reg (Bit xlen)
   , execOperands :: [Wire (Bit xlen)]
-    -- Is the instruction in the execute stage mispredicted?
-  , execMispredict :: Wire (Bit 1)
     -- The PC of the next instruction expected in the execute stage.
   , execExpectedPC :: Reg (Bit xlen)
+    -- Is the instruction in the execute stage mispredicted?
+  , execMispredict :: Wire (Bit 1)
     -- Is the execute stage stalling?
   , execStall :: Wire (Bit 1)
     -- Instruction result
