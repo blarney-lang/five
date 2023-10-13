@@ -55,7 +55,7 @@ data BTBEntry xlen =
 
 -- Create BTB-based predictor using BTB with 2^n entries
 makeBTBPredictor :: forall n xlen mreq.
-     (KnownNat n, KnownNat xlen, n <= xlen)
+     (KnownNat n, KnownNat xlen)
   => Bit xlen
   -> PipelineState xlen mreq
   -> Module (BranchPred xlen)
@@ -66,10 +66,14 @@ makeBTBPredictor instrLen s = do
   -- BTB entry being looked up
   lookup <- makeReg dontCare
 
+  -- Function to map PC to RAM index
+  let getIdx :: Bit xlen -> Bit n
+      getIdx = unsafeSlice (valueOf @n + 1, 2)
+
   -- Update BTB
   always do
     when s.execBranch.active do
-      btb.store (truncate s.execPC.val)
+      btb.store (getIdx s.execPC.val)
         BTBEntry {
           valid = true
         , pc = s.execPC.val
@@ -79,7 +83,7 @@ makeBTBPredictor instrLen s = do
   return
     BranchPred {
       predict = \fetchPC -> do
-        btb.load (truncate fetchPC)
+        btb.load (getIdx fetchPC)
         lookup <== fetchPC
     , out = if btb.out.valid .&&. btb.out.pc .==. lookup.val
               then btb.out.target
