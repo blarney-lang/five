@@ -84,7 +84,7 @@ makeForwardingRegFile regMem instrSet s = do
     -- Is there a data hazard reading given register?
     hazard reg = reg.valid .&&.
          ( s.execActive.val .&&. s.execInstr `loads` reg.val
-      .||. s.memActive.val  .&&. s.memInstr  `loads` reg.val )
+      .||. s.memStall.val   .&&. s.memInstr  `loads` reg.val )
 
     -- Does given instruction write to given reg?
     instr `writes` reg = rd.valid .&&. rd.val .==. reg
