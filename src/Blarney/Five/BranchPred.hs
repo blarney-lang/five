@@ -61,12 +61,14 @@ makeBTBPredictor :: forall n xlen mreq.
   -> Module (BranchPred xlen)
 makeBTBPredictor instrLen s = do
   -- Branch target buffer
+  -- TODO: need to call preserveOut when not loading?
   btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
 
   -- BTB entry being looked up
   lookup <- makeReg dontCare
 
   -- Function to map PC to RAM index
+  -- TODO: want instruction length as integer here
   let getIdx :: Bit xlen -> Bit n
       getIdx = unsafeSlice (valueOf @n + 1, 2)
 

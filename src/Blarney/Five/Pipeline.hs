@@ -97,7 +97,9 @@ decode p s = do
     -- Setup execute stage and consume imem response
     zipWithM (<==) s.execOperands regFile.operands
     when (inv s.execStall.val) do
-      s.execActive <== s.decActive.val .&&. inv stall
+      s.execActive <== s.decActive.val .&&. inv stall .&&.
+                         -- TODO: is there a better way to flush?
+                         inv s.execMispredict.val
       s.execInstr <== instr
       s.execPC <== s.decPC.val
       when p.imem.resps.canPeek do
