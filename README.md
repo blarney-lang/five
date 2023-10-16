@@ -11,6 +11,10 @@ demonstrates use of the pipeline in an actual processor core.  Five is
 written in Haskell using the
 [Blarney](https://github.com/blarney-lang/blarney) library. 
 
+Five was developed on the [CAPcelerate
+project](https://gow.epsrc.ukri.org/NGBOViewGrant.aspx?GrantRef=EP/V000381/1),
+part of the UKRI's Digital Security by Design programme.
+
 ## Dependencies
 
 First, download the repo:
