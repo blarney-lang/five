@@ -1,5 +1,6 @@
 module Blarney.Five
-  ( module Blarney.Five.RegMem
+  ( module Blarney.Five.Verify
+  , module Blarney.Five.RegMem
   , module Blarney.Five.RegFile
   , module Blarney.Five.Pipeline
   , module Blarney.Five.Interface

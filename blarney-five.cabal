@@ -51,11 +51,11 @@ library
     Blarney.Five.Interface
     Blarney.Five.BranchPred
 
---executable blarney-five-gen
---  import: blarney-five-common
---  main-is: Main.hs
---  hs-source-dirs: gen
---  build-depends: blarney-five
+executable blarney-five-gen
+  import: blarney-five-common
+  main-is: Main.hs
+  hs-source-dirs: gen
+  build-depends: blarney-five
 
 --test-suite blarney-five-tests
 --  import: blarney-five-common

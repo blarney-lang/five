@@ -1,4 +1,4 @@
-module Blarney.Five.Verify where
+module Blarney.Five.Verify (verify) where
 
 import Blarney
 import Blarney.Queue
