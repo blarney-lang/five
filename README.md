@@ -24,9 +24,9 @@ known working) or later, and GHC (version 9.4.5 known working).
 
 On Ubuntu 22.04, we can do:
 ```sh
-$ sudo apt install verilator
-$ sudo apt install gcc-riscv64-unknown-elf
-$ sudo apt install libgmp-dev
+sudo apt install verilator
+sudo apt install gcc-riscv64-unknown-elf
+sudo apt install libgmp-dev
 ```
 
 Version 4.12.2 of z3 can be found in this [zip
@@ -45,10 +45,10 @@ make shell
 To generate SMT formulae capturing the correctness of the pipeline:
 
 ```sh
-$ cabal run
+cabal run
 ```
 
-The formulae are written to the `SMT/` director. To run these through
+The formulae are written to the `SMT/` directory. To run these through
 the z3 solver:
 
 ```sh
