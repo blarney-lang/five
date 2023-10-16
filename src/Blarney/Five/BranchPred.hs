@@ -56,10 +56,10 @@ data BTBEntry xlen =
 -- Create BTB-based predictor using BTB with 2^n entries
 makeBTBPredictor :: forall n xlen mreq.
      (KnownNat n, KnownNat xlen)
-  => Bit xlen
+  => Int
   -> PipelineState xlen mreq
   -> Module (BranchPred xlen)
-makeBTBPredictor instrLen s = do
+makeBTBPredictor logInstrLen s = do
   -- Branch target buffer
   -- TODO: need to call preserveOut when not loading?
   btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
@@ -68,9 +68,8 @@ makeBTBPredictor instrLen s = do
   lookup <- makeReg dontCare
 
   -- Function to map PC to RAM index
-  -- TODO: want instruction length as integer here
   let getIdx :: Bit xlen -> Bit n
-      getIdx = unsafeSlice (valueOf @n + 1, 2)
+      getIdx = unsafeSlice (valueOf @n + logInstrLen - 1, logInstrLen)
 
   -- Update BTB
   always do
@@ -89,5 +88,5 @@ makeBTBPredictor instrLen s = do
         lookup <== fetchPC
     , out = if btb.out.valid .&&. btb.out.pc .==. lookup.val
               then btb.out.target
-              else lookup.val + instrLen
+              else lookup.val + fromInteger (2 ^ logInstrLen)
     }
