@@ -7,6 +7,7 @@ import Blarney
 import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
+import Blarney.Five.Util
 import Blarney.Five.Interface
 
 -- Pipeline state
@@ -26,7 +27,7 @@ makeState p = do
   execPC         <- makeReg dontCare
   execOperands   <- replicateM p.instrSet.numSrcs
                       (makeWire dontCare)
-  execMispredict <- makeWire false
+  execMispredict <- makeSetResetBypass
   execExpectedPC <- makeReg p.initPC
   execStall      <- makeWire false
   execResult     <- makeWire dontCare
@@ -62,18 +63,14 @@ fetch p s = do
   seenMispred <- makeReg false
 
   always do
-    let fetchPC = if s.execMispredict.val .||. seenMispred.val
+    let fetchPC = if s.execMispredict.val
           then s.execExpectedPC.val
           else branchPred.out
     -- Issue imem request
-    if inv s.decStall.val .&&. p.imem.reqs.canPut
-      then do
-        p.imem.reqs.put fetchPC
-        branchPred.predict fetchPC
-        seenMispred <== false
-      else do
-        when s.execMispredict.val do
-          seenMispred <== true
+    when (inv s.decStall.val .&&. p.imem.reqs.canPut) do
+      p.imem.reqs.put fetchPC
+      branchPred.predict fetchPC
+      s.execMispredict.reset
     -- Setup decode stage
     when (inv s.decStall.val) do
       s.decActive <== p.imem.reqs.canPut
@@ -98,7 +95,6 @@ decode p s = do
     zipWithM (<==) s.execOperands regFile.operands
     when (inv s.execStall.val) do
       s.execActive <== s.decActive.val .&&. inv stall .&&.
-                         -- TODO: is there a better way to flush?
                          inv s.execMispredict.val
       s.execInstr <== instr
       s.execPC <== s.decPC.val
@@ -126,7 +122,7 @@ execute p s = do
       (s.memStall.val .||. inv memReady)
     -- Look for misprediction
     let mispredict = s.execPC.val .!=. s.execExpectedPC.val
-    s.execMispredict <== s.execActive.val .&&. mispredict
+    when (s.execActive.val .&&. mispredict) do s.execMispredict.set
     -- Issue instruction to execution unit
     let fire = s.execActive.val .&&. inv s.memStall.val .&&.
                  inv mispredict .&&. memReady

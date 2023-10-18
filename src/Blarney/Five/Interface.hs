@@ -1,9 +1,13 @@
 module Blarney.Five.Interface where
 
+-- Blarney imports
 import Blarney
 import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
+
+-- Local imports
+import Blarney.Five.Util
 
 -- Interface between instruction set and pipeline
 -- ==============================================
@@ -123,7 +127,7 @@ data PipelineState xlen instr =
     -- The PC of the next instruction expected in the execute stage.
   , execExpectedPC :: Reg (Bit xlen)
     -- Is the instruction in the execute stage mispredicted?
-  , execMispredict :: Wire (Bit 1)
+  , execMispredict :: SetReset
     -- Is the execute stage stalling?
   , execStall :: Wire (Bit 1)
     -- Instruction result
