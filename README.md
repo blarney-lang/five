@@ -24,7 +24,7 @@ git clone --recursive https://github.com/blarney-lang/five
 ```
 
 We'll need Verilator, a RISC-V compiler, the z3 solver (version 4.12.2
-known working) or later, and GHC (version 9.4.5 known working).
+known working), and GHC (version 9.4.5 known working).
 
 On Ubuntu 22.04, we can do:
 ```sh
