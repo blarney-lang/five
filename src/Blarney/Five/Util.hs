@@ -14,16 +14,16 @@ data SetReset =
   , val   :: Bit 1
   }
 
--- Set-dominant set/reset latch with 0-cycle set
+-- Set/reset latch with 0-cycle set
 makeSetResetBypass = do
   setWire   <- makeWire false
   resetWire <- makeWire false
   latch     <- makeReg false
 
   always do
-    if setWire.val
-      then latch <== true
-      else when resetWire.val do latch <== false
+    if resetWire.val
+      then latch <== false
+      else when setWire.val do latch <== true
 
   return
     SetReset {
