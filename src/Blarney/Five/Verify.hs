@@ -132,8 +132,8 @@ makeGoldenExecUnit initPC instrLen enAsserts = do
           assert operandsOk "Operands correct"
     }
 
--- Bounded number of consecutive branch mispredictions
-checkMispredsBounded s = do
+-- No consecutive branch mispredictions
+checkNoConsecutiveMispreds s = do
   -- The number of consecutive branch mispredictions
   mispreds :: Reg (Bit 2) <- makeReg 0
 
@@ -142,8 +142,8 @@ checkMispredsBounded s = do
       if s.execMispredict.val
         then mispreds <== mispreds.val + 1
         else mispreds <== 0
-    assert (mispreds.val .<=. 2)
-           "Max of two consecutive branch mispredictions"
+    assert (mispreds.val .<=. 1)
+           "No consecutive branch mispredictions"
 
 -- Check that at least n instructions can be retired within given
 -- time bound t.
@@ -184,7 +184,7 @@ makeCorrectnessVerifier = do
                          then makeForwardingRegFile rmem instrSet
                          else makeBasicRegFile rmem instrSet
     }
-  checkMispredsBounded s
+  checkNoConsecutiveMispreds s
 
 -- Pipeline for forward progress verification
 makeForwardProgressVerifier :: Int -> Int -> Module ()
