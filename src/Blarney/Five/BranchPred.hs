@@ -61,7 +61,6 @@ makeBTBPredictor :: forall n xlen mreq.
   -> Module (BranchPred xlen)
 makeBTBPredictor logInstrLen s = do
   -- Branch target buffer
-  -- TODO: need to call preserveOut when not loading?
   btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
 
   -- BTB entry being looked up
@@ -69,7 +68,7 @@ makeBTBPredictor logInstrLen s = do
 
   -- Function to map PC to RAM index
   let getIdx :: Bit xlen -> Bit n
-      getIdx = unsafeSlice (valueOf @n + logInstrLen - 1, logInstrLen)
+      getIdx = untypedSlice (valueOf @n + logInstrLen - 1, logInstrLen)
 
   -- Update BTB
   always do

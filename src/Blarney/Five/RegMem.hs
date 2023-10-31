@@ -89,17 +89,12 @@ makeRegMemRAM numReadPorts = do
   -- Read enable wire
   readEnable <- makeWire false
 
-  always do
-    when (inv readEnable.val) do
-      sequence_ [ ram.preserveOut | ram <- rams ]
-
   return
     RegMem {
       load = \rss -> do
-        sequence
+        sequence_
           [ ram.load r
           | (ram, r) <- zip rams rss ]
-        readEnable <== true
     , outs = map (.out) rams
     , store = \r x ->
         sequence_ [ ram.store r x | ram <- rams ]
