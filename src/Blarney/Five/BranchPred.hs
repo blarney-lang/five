@@ -11,7 +11,7 @@ import Blarney.Five.Interface
 makeNaivePredictor ::
      KnownNat xlen
   => Bit xlen
-  -> PipelineState xlen mreq
+  -> PipelineState xlen instr
   -> Module (BranchPred xlen)
 makeNaivePredictor instrLen s = do
   predPC <- makeReg dontCare
@@ -28,10 +28,9 @@ makeNaivePredictor instrLen s = do
 -- Predict using a universtally-quantified variable, for verification
 makeArbitraryPredictor ::
      KnownNat xlen
-  => Bit xlen
-  -> PipelineState xlen mreq
+  => PipelineState xlen instr
   -> Module (BranchPred xlen)
-makeArbitraryPredictor instrLen s = do
+makeArbitraryPredictor s = do
   return
     BranchPred {
       predict = \fetchPC -> return ()
@@ -54,12 +53,13 @@ data BTBEntry xlen =
   deriving (Generic, Bits)
 
 -- Create BTB-based predictor using BTB with 2^n entries
-makeBTBPredictor :: forall n xlen mreq.
+makeBTBPredictor :: forall n xlen ilen instr lregs mreq.
      (KnownNat n, KnownNat xlen)
   => Int
-  -> PipelineState xlen mreq
+  -> InstrSet xlen ilen instr lregs mreq
+  -> PipelineState xlen instr
   -> Module (BranchPred xlen)
-makeBTBPredictor logInstrLen s = do
+makeBTBPredictor logInstrBytes instrSet s = do
   -- Branch target buffer
   btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
 
@@ -68,14 +68,14 @@ makeBTBPredictor logInstrLen s = do
 
   -- Function to map PC to RAM index
   let getIdx :: Bit xlen -> Bit n
-      getIdx = untypedSlice (valueOf @n + logInstrLen - 1, logInstrLen)
+      getIdx = untypedSlice (valueOf @n + logInstrBytes - 1, logInstrBytes)
 
   -- Update BTB
   always do
-    when s.execBranch.active do
+    when (instrSet.canBranch s.execInstr.val) do
       btb.store (getIdx s.execPC.val)
         BTBEntry {
-          valid = true
+          valid = s.execBranch.active
         , pc = s.execPC.val
         , target = s.execBranch.val
         }
@@ -87,5 +87,5 @@ makeBTBPredictor logInstrLen s = do
         lookup <== fetchPC
     , out = if btb.out.valid .&&. btb.out.pc .==. lookup.val
               then btb.out.target
-              else lookup.val + fromInteger (2 ^ logInstrLen)
+              else lookup.val + fromInteger (2 ^ logInstrBytes)
     }

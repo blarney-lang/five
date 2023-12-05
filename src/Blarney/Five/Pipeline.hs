@@ -55,21 +55,15 @@ type PipelineStage xlen ilen instr lregs mreq =
 -- ==========================
 
 fetch :: PipelineStage xlen ilen instr lregs mreq
-fetch p s = do
-  -- Create branch target predictor
-  branchPred <- p.makeBranchPred s
-
-  -- Have we seen a misprediction since the previous fetch?
-  seenMispred <- makeReg false
-
+fetch p s =
   always do
     let fetchPC = if s.execMispredict.val
           then s.execExpectedPC.val
-          else branchPred.out
+          else p.branchPred.out
     -- Issue imem request
     when (inv s.decStall.val .&&. p.imem.reqs.canPut) do
       p.imem.reqs.put fetchPC
-      branchPred.predict fetchPC
+      p.branchPred.predict fetchPC
       s.execMispredict.reset
     -- Setup decode stage
     when (inv s.decStall.val) do
@@ -80,37 +74,31 @@ fetch p s = do
 -- ===========================================
 
 decode :: PipelineStage xlen ilen instr lregs mreq
-decode p s = do
-  -- Create register file
-  regFile <- p.makeRegFile s
-
+decode p s =
   always do
     -- Decode instruction
     let instr = p.instrSet.decode p.imem.resps.peek
     -- Issue stall to earlier stage
-    let stall = s.execStall.val .||. regFile.stall
+    let stall = s.execStall.val .||. p.regFile.stall
                                 .||. inv p.imem.resps.canPeek
     s.decStall <== s.decActive.val .&&. stall
     -- Setup execute stage and consume imem response
-    zipWithM (<==) s.execOperands regFile.operands
+    zipWithM (<==) s.execOperands p.regFile.operands
     when (inv s.execStall.val) do
       s.execActive <== s.decActive.val .&&. inv stall .&&.
                          inv s.execMispredict.val
       s.execInstr <== instr
       s.execPC <== s.decPC.val
       when p.imem.resps.canPeek do
-        regFile.submit instr
-        when (inv regFile.stall) do p.imem.resps.consume
+        p.regFile.submit instr
+        when (inv p.regFile.stall) do p.imem.resps.consume
 
 -- Stage 3: execute
 -- ================
 
 execute :: PipelineStage xlen ilen instr lregs mreq
 execute p s = do
-  -- Create execution unit
-  execUnit <- p.instrSet.makeExecUnit
-
-  -- Wires for communicating with execution unit
+  -- Memory request wire, optionally written by an instruction
   memReq <- makeWire dontCare
 
   always do
@@ -127,7 +115,7 @@ execute p s = do
     let fire = s.execActive.val .&&. inv s.memStall.val .&&.
                  inv mispredict .&&. memReady
     when fire do
-      execUnit.issue s.execInstr.val
+      p.instrSet.execute s.execInstr.val
         ExecState {
           pc       = ReadWrite s.execPC.val (s.execBranch <==)
         , operands = map (.val) s.execOperands

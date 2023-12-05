@@ -66,16 +66,18 @@ data V_Instr =
   , rs1 :: Option (Bit V_LogRegs)
   , rs2 :: Option (Bit V_LogRegs)
   , isMemAccess :: Bit 1
+  , canBranch :: Bit 1
   }
   deriving (Generic, Bits)
 
 -- Instruction set interface for verification
-v_instrSet initPC instrLen enAsserts =
+v_instrSet execute =
   InstrSet {
     getDest     = \i -> i.rd
   , getSrcs     = \i -> [i.rs1, i.rs2]
   , numSrcs     = numSrcs
   , isMemAccess = \i -> i.isMemAccess
+  , canBranch   = \i -> i.canBranch
   , decode      = \uid ->
       V_Instr {
         uid = uid
@@ -83,54 +85,53 @@ v_instrSet initPC instrLen enAsserts =
       , rs1 = Option (var "rs1_valid") (var "rs1")
       , rs2 = Option (var "rs2_valid") (var "rs2")
       , isMemAccess = var "is_mem_access"
+      , canBranch = var "can_branch"
       }
-  , makeExecUnit = makeGoldenExecUnit initPC instrLen enAsserts
+  , execute     = execute
   }
 
 -- Execution unit for verification
 makeGoldenExecUnit :: Bit V_XLen -> Bit V_XLen -> Bool ->
-  Module (ExecUnit V_XLen V_Instr V_MemReq)
+  Module (V_Instr -> ExecState V_XLen V_MemReq -> Action ())
 makeGoldenExecUnit initPC instrLen enAsserts = do
   goldenPC   <- makeReg initPC
   goldenRegs <- replicateM (2 ^ valueOf @V_LogRegs) (makeReg 0)
   stall <- makeWire false
 
-  return
-    ExecUnit {
-      issue = \instr s -> do
-        -- Check that correct instruction has been supplied
-        when enAsserts do
-          assert (instr.uid .==. s.pc.val) "Instruction correct"
+  return \instr s -> do
+    -- Check that correct instruction has been supplied
+    when enAsserts do
+      assert (instr.uid .==. s.pc.val) "Instruction correct"
 
-        -- Issue memory request
-        let req = var "req"
-        when instr.isMemAccess do
-          s.memReq <== V_MemReq { uid = req, hasResp = instr.rd.valid }
+    -- Issue memory request
+    let req = var "req"
+    when instr.isMemAccess do
+      s.memReq <== V_MemReq { uid = req, hasResp = instr.rd.valid }
 
-        -- Optionally perform a branch
-        let branch = Option (var "branch_valid") (var "branch")
-        when branch.valid do s.pc <== branch.val
-        -- Check and maintain golden PC
-        when enAsserts do
-          assert (s.pc.val .==. goldenPC.val) "PC correct"
-        when (inv stall.val) do
-          goldenPC <== if branch.valid then branch.val
-                         else goldenPC.val + instrLen
+    -- Optionally perform a branch
+    let branch = instr.canBranch .&&. var "branch_valid"
+    let branchTarget = var "branch_target"
+    when branch do s.pc <== branchTarget
+    -- Check and maintain golden PC
+    when enAsserts do
+      assert (s.pc.val .==. goldenPC.val) "PC correct"
+    when (inv stall.val) do
+      goldenPC <== if branch then branchTarget
+                     else goldenPC.val + instrLen
 
-        -- Write result and update golden register file
-        when instr.rd.valid do
-          let result = var "result"
-          s.result <== result
-          goldenRegs ! instr.rd.val <==
-            if instr.isMemAccess then req else result
+    -- Write result and update golden register file
+    when instr.rd.valid do
+      let result = var "result"
+      s.result <== result
+      goldenRegs ! instr.rd.val <==
+        if instr.isMemAccess then req else result
 
-        -- Check operands against golden register file
-        let operandsOk =
-              andList [ r.valid .==>. (goldenRegs!r.val).val .==. o
-                      | (r, o) <- zip [instr.rs1, instr.rs2] s.operands ]
-        when enAsserts do
-          assert operandsOk "Operands correct"
-    }
+    -- Check operands against golden register file
+    let operandsOk =
+          andList [ r.valid .==>. (goldenRegs!r.val).val .==. o
+                  | (r, o) <- zip [instr.rs1, instr.rs2] s.operands ]
+    when enAsserts do
+      assert operandsOk "Operands correct"
 
 -- No consecutive branch mispredictions
 checkNoConsecutiveMispreds s = do
@@ -162,7 +163,7 @@ checkForwardProgress n t s = do
 
 -- Pipeline for correctness verification
 makeCorrectnessVerifier :: Module ()
-makeCorrectnessVerifier = do
+makeCorrectnessVerifier = mdo
   imem <- makeMapFilterServer (var "imem_put_mask")
                               (var "imem_peek_mask")
                               (const true) id
@@ -171,42 +172,46 @@ makeCorrectnessVerifier = do
                               (.hasResp) (.uid)
   rmem <- if enRegFwd then makeForwardingRegMem numSrcs
                       else makeRegMem numSrcs
-  let instrSet = v_instrSet 0 1 True
+  bpred <- makeArbitraryPredictor s
+  exec  <- makeGoldenExecUnit 0 1 True
+  let iset = v_instrSet exec
+  rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
+                       else makeBasicRegFile rmem iset s
   s <- makeClassic
     PipelineParams {
       initPC         = 0
     , instrLen       = 1
     , imem           = imem
     , dmem           = dmem
-    , instrSet       = instrSet
-    , makeBranchPred = makeArbitraryPredictor 1
-    , makeRegFile    = if enRegFwd
-                         then makeForwardingRegFile rmem instrSet
-                         else makeBasicRegFile rmem instrSet
+    , instrSet       = iset
+    , branchPred     = bpred
+    , regFile        = rf
     }
   checkNoConsecutiveMispreds s
 
 -- Pipeline for forward progress verification
 makeForwardProgressVerifier :: Int -> Int -> Module ()
-makeForwardProgressVerifier n d = do
-    imem <- makeMapFilterServer true true (const true) id
-    dmem <- makeMapFilterServer true true (.hasResp) (.uid)
-    rmem <- if enRegFwd then makeForwardingRegMem numSrcs
-                        else makeRegMem numSrcs
-    let instrSet = v_instrSet 0 1 False
-    s <- makeClassic
-      PipelineParams {
-        initPC         = 0
-      , instrLen       = 1
-      , imem           = imem
-      , dmem           = dmem
-      , instrSet       = instrSet
-      , makeBranchPred = makeArbitraryPredictor 1
-      , makeRegFile    = if enRegFwd
-                           then makeForwardingRegFile rmem instrSet
-                           else makeBasicRegFile rmem instrSet
-      }
-    checkForwardProgress (fromIntegral n) (fromIntegral d) s
+makeForwardProgressVerifier n d = mdo
+  imem  <- makeMapFilterServer true true (const true) id
+  dmem  <- makeMapFilterServer true true (.hasResp) (.uid)
+  bpred <- makeArbitraryPredictor s
+  rmem  <- if enRegFwd then makeForwardingRegMem numSrcs
+                       else makeRegMem numSrcs
+  exec  <- makeGoldenExecUnit 0 1 False
+  let iset = v_instrSet exec
+  rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
+                       else makeBasicRegFile rmem iset s
+  s <- makeClassic
+    PipelineParams {
+      initPC         = 0
+    , instrLen       = 1
+    , imem           = imem
+    , dmem           = dmem
+    , instrSet       = iset
+    , branchPred     = bpred
+    , regFile        = rf
+    }
+  checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
 -- Generate SMT scripts for verification
 verify :: IO ()
@@ -215,12 +220,12 @@ verify = do
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
   writeSMTScript conf makeCorrectnessVerifier "Correctness" "SMT"
 
-  let d    = 10
+  let d    = 9
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
   writeSMTScript conf (makeForwardProgressVerifier 1 (d-1))
                  "ForwardProgress1" "SMT"
 
-  let d    = 18
+  let d    = 14
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
   writeSMTScript conf (makeForwardProgressVerifier 2 (d-1))
                  "ForwardProgress2" "SMT"

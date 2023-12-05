@@ -27,23 +27,18 @@ data InstrSet xlen ilen instr lregs mreq =
   , numSrcs :: Int
     -- Will instruction issue a data memory request?
   , isMemAccess :: instr -> Bit 1
-    -- Execution unit (instruction semantics)
-  , makeExecUnit :: Module (ExecUnit xlen instr mreq)
+    -- Can instruction branch?
+  , canBranch :: instr -> Bit 1
+    -- Function to execute a given instruction
+  , execute :: instr -> ExecState xlen mreq -> Action ()
   }
 
--- Execution unit interface
-data ExecUnit xlen instr mreq =
-  ExecUnit {
-    -- Execute given instruction, reading/writing given state
-    issue :: instr -> ExecState xlen mreq -> Action ()
-  }
-
--- State available to the execution unit
+-- State that can be read/written by an instruction
 data ExecState xlen mreq =
   ExecState {
     -- Program counter (can be read and written)
     pc :: ReadWrite (Bit xlen)
-    -- Instruction operands from the register file
+    -- Instruction operands from the register file (read-only)
   , operands :: [Bit xlen]
     -- Instruction result (write-only)
   , result :: WriteOnly (Bit xlen)
@@ -66,12 +61,10 @@ data PipelineParams xlen ilen instr lregs mreq =
   , dmem :: Server mreq (Bit xlen)
     -- Instruction set definition
   , instrSet :: InstrSet xlen ilen instr lregs mreq
-    -- Branch predictor module
-  , makeBranchPred :: PipelineState xlen instr
-                   -> Module (BranchPred xlen)
-    -- Register file module
-  , makeRegFile :: PipelineState xlen instr
-                -> Module (RF xlen instr)
+    -- Interface to branch predictor
+  , branchPred :: BranchPred xlen
+    -- Interface to register file
+  , regFile :: RF xlen instr
   }
 
 -- Branch target predictor
