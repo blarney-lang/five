@@ -164,11 +164,7 @@ writeback p s = return ()
 -- Classic 5-stage pipeline
 -- ========================
 
-makePipeline ::
-  (KnownNat xlen, Bits instr, Bits mreq) =>
-       PipelineParams xlen ilen instr lregs mreq
-    -> PipelineState xlen instr
-    -> Module ()
+makePipeline :: PipelineStage xlen ilen instr lregs mreq
 makePipeline p s = do
   fetch p s
   decode p s
