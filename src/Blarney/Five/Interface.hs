@@ -116,7 +116,6 @@ data PipelineState xlen instr =
     -- If so, the instruction to execute with its PC and operands.
   , execInstr :: Reg instr
   , execPC :: Reg (Bit xlen)
-  , execOperands :: [Wire (Bit xlen)]
     -- The PC of the next instruction expected in the execute stage.
   , execExpectedPC :: Reg (Bit xlen)
     -- Is the instruction in the execute stage mispredicted?

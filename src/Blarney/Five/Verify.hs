@@ -178,18 +178,19 @@ makeCorrectnessVerifier = mdo
   let iset = v_instrSet exec
   rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
                        else makeBasicRegFile rmem iset s
-  s <- makeClassic
-    PipelineParams {
-      initPC         = 0
-    , instrLen       = 1
-    , imem           = imem
-    , dmem           = dmem
-    , instrSet       = iset
-    , branchPred     = bpred
-    , regFile        = rf
-    }
-  --checkNoConsecutiveMispreds s
-  return ()
+  let params = 
+        PipelineParams {
+          initPC         = 0
+        , instrLen       = 1
+        , imem           = imem
+        , dmem           = dmem
+        , instrSet       = iset
+        , branchPred     = bpred
+        , regFile        = rf
+        }
+  s <- makePipelineState params
+  makePipeline params s
+  checkNoConsecutiveMispreds s
 
 -- Pipeline for forward progress verification
 makeForwardProgressVerifier :: Int -> Int -> Module ()
@@ -203,16 +204,18 @@ makeForwardProgressVerifier n d = mdo
   let iset = v_instrSet exec
   rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
                        else makeBasicRegFile rmem iset s
-  s <- makeClassic
-    PipelineParams {
-      initPC         = 0
-    , instrLen       = 1
-    , imem           = imem
-    , dmem           = dmem
-    , instrSet       = iset
-    , branchPred     = bpred
-    , regFile        = rf
-    }
+  let params =
+        PipelineParams {
+          initPC         = 0
+        , instrLen       = 1
+        , imem           = imem
+        , dmem           = dmem
+        , instrSet       = iset
+        , branchPred     = bpred
+        , regFile        = rf
+        }
+  s <- makePipelineState params
+  makePipeline params s
   checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
 -- Max cycles to retire 1 instruction

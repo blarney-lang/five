@@ -14,19 +14,17 @@ import Blarney.Five.Interface
 -- ==============
 
 -- Create pipeline state
-makeState ::
+makePipelineState ::
   (KnownNat xlen, Bits instr, Bits mreq) =>
        PipelineParams xlen ilen instr lregs mreq
     -> Module (PipelineState xlen instr)
-makeState p = do
+makePipelineState p = do
   decActive      <- makeReg false
   decPC          <- makeReg dontCare
   decStall       <- makeWire false
   execActive     <- makeReg false
   execInstr      <- makeReg dontCare
   execPC         <- makeReg dontCare
-  execOperands   <- replicateM p.instrSet.numSrcs
-                      (makeWire dontCare)
   execMispredict <- makeSetResetBypass
   execExpectedPC <- makeReg p.initPC
   execStall      <- makeWire false
@@ -77,17 +75,19 @@ fetch p s =
 decode :: PipelineStage xlen ilen instr lregs mreq
 decode p s =
   always do
+    -- Can decode stage fire?
+    let canFire = p.imem.resps.canPeek
+             .&&. inv s.execStall.val
+             .&&. inv p.regFile.stall
+    -- Issue stall to earlier stage
+    s.decStall <== s.decActive.val .&&. inv canFire
     -- Decode instruction
     let instr = p.instrSet.decode p.imem.resps.peek
-    -- Issue stall to earlier stage
-    let stall = s.execStall.val .||. p.regFile.stall
-                                .||. inv p.imem.resps.canPeek
-    s.decStall <== s.decActive.val .&&. stall
     -- Setup execute stage and consume imem response
-    zipWithM (<==) s.execOperands p.regFile.operands
     when (inv s.execStall.val) do
-      s.execActive <== s.decActive.val .&&. inv stall .&&.
-                         inv s.execMispredict.val
+      s.execActive <== s.decActive.val
+                  .&&. canFire
+                  .&&. inv s.execMispredict.val
       s.execInstr <== instr
       s.execPC <== s.decPC.val
       when p.imem.resps.canPeek do
@@ -105,21 +105,21 @@ execute p s = do
   always do
     -- Is memory ready for a new request?
     let isMemAccess = p.instrSet.isMemAccess s.execInstr.val
-    let memReady = if isMemAccess then p.dmem.reqs.canPut else true
+    let waitForMem = isMemAccess .&&. inv p.dmem.reqs.canPut
+    -- Can decode stage fire?
+    let canFire = inv s.memStall.val .&&. inv waitForMem
     -- Issue stall to earlier stages
-    s.execStall <== s.execActive.val .&&.
-      (s.memStall.val .||. inv memReady)
+    s.execStall <== s.execActive.val .&&. inv canFire
     -- Look for misprediction
     let mispredict = s.execPC.val .!=. s.execExpectedPC.val
     when (s.execActive.val .&&. mispredict) do s.execMispredict.set
     -- Issue instruction to execution unit
-    let fire = s.execActive.val .&&. inv s.memStall.val .&&.
-                 inv mispredict .&&. memReady
+    let fire = s.execActive.val .&&. canFire .&&. inv mispredict
     when fire do
       p.instrSet.execute s.execInstr.val
         ExecState {
           pc       = ReadWrite s.execPC.val (s.execBranch <==)
-        , operands = map (.val) s.execOperands
+        , operands = p.regFile.operands
         , result   = WriteOnly (s.execResult <==)
         , memReq   = WriteOnly (memReq <==)
         }
@@ -164,15 +164,14 @@ writeback p s = return ()
 -- Classic 5-stage pipeline
 -- ========================
 
-makeClassic ::
+makePipeline ::
   (KnownNat xlen, Bits instr, Bits mreq) =>
        PipelineParams xlen ilen instr lregs mreq
-    -> Module (PipelineState xlen instr)
-makeClassic p = do
-  s <- makeState p
+    -> PipelineState xlen instr
+    -> Module ()
+makePipeline p s = do
   fetch p s
   decode p s
   execute p s
   memAccess p s
   writeback p s
-  return s
