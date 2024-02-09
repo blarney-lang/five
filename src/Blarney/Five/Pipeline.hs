@@ -57,18 +57,19 @@ type PipelineStage xlen ilen instr lregs mreq =
 fetch :: PipelineStage xlen ilen instr lregs mreq
 fetch p s =
   always do
+    -- Address of instruction to fetch
     let fetchPC = if s.execMispredict.val
           then s.execExpectedPC.val
           else p.branchPred.out
-    -- Issue imem request
-    when (inv s.decStall.val .&&. p.imem.reqs.canPut) do
-      p.imem.reqs.put fetchPC
-      p.branchPred.predict fetchPC
-      s.execMispredict.reset
     -- Setup decode stage
     when (inv s.decStall.val) do
       s.decActive <== p.imem.reqs.canPut
       s.decPC <== fetchPC
+      -- Issue imem request
+      when p.imem.reqs.canPut do
+        p.imem.reqs.put fetchPC
+        p.branchPred.predict fetchPC
+        s.execMispredict.reset
 
 -- Stage 2: instruction decode & operand fetch
 -- ===========================================
