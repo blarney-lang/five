@@ -1,12 +1,10 @@
 .PHONY: smt-files
 smt-files:
-	cabal run
+	cabal run blarney-five-gen
 
 .PHONY: verify
-verify: smt-files
-	z3 SMT/Correctness.smt2
-	z3 SMT/ForwardProgress1.smt2
-	z3 SMT/ForwardProgress2.smt2
+verify:
+	cabal run blarney-five-verify
 
 # Docker variables
 USER=$(if $(shell id -u),$(shell id -u),9001)

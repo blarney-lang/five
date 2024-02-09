@@ -53,13 +53,12 @@ library
 
 executable blarney-five-gen
   import: blarney-five-common
-  main-is: Main.hs
-  hs-source-dirs: gen
+  main-is: GenSMT.hs
+  hs-source-dirs: verify
   build-depends: blarney-five
 
---test-suite blarney-five-tests
---  import: blarney-five-common
---  type: exitcode-stdio-1.0
---  main-is: Tests.hs
---  hs-source-dirs: tests
---  build-depends: blarney-five
+executable blarney-five-verify
+  import: blarney-five-common
+  main-is: Verify.hs
+  hs-source-dirs: verify
+  build-depends: blarney-five

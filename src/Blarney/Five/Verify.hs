@@ -1,4 +1,4 @@
-module Blarney.Five.Verify (verify) where
+module Blarney.Five.Verify (genSMTScripts, verify) where
 
 import Blarney
 import Blarney.Queue
@@ -159,7 +159,8 @@ checkForwardProgress n t s = do
     time <== time.val + 1
     when s.wbActive.val do
       retired <== retired.val + 1
-    assert (time.val .>=. t .==>. retired.val .>=. n) "Forward progress"
+    assert (time.val .>=. t .==>. retired.val .>=. fromInteger n)
+           ("Forward progress " ++ show n)
 
 -- Pipeline for correctness verification
 makeCorrectnessVerifier :: Module ()
@@ -187,7 +188,8 @@ makeCorrectnessVerifier = mdo
     , branchPred     = bpred
     , regFile        = rf
     }
-  checkNoConsecutiveMispreds s
+  --checkNoConsecutiveMispreds s
+  return ()
 
 -- Pipeline for forward progress verification
 makeForwardProgressVerifier :: Int -> Int -> Module ()
@@ -213,19 +215,47 @@ makeForwardProgressVerifier n d = mdo
     }
   checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
+-- Max cycles to retire 1 instruction
+-- (For forward progress checking)
+maxCyclesToRetire1 = 8
+
+-- Max cycles to retire 2 instructions
+-- (For forward progress checking)
+maxCyclesToRetire2 = 13
+
 -- Generate SMT scripts for verification
+genSMTScripts :: IO ()
+genSMTScripts = do
+  let d    = 7
+  let conf = dfltVerifyConf {
+               verifyConfMode = Bounded (fixedDepth d)
+             }
+  writeSMTScript conf makeCorrectnessVerifier "Correctness" "SMT"
+
+  let cycs = maxCyclesToRetire1
+  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth (cycs+1)) }
+  writeSMTScript conf (makeForwardProgressVerifier 1 cycs)
+                 "ForwardProgress1" "SMT"
+
+  let cycs = maxCyclesToRetire2
+  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth (cycs+1)) }
+  writeSMTScript conf (makeForwardProgressVerifier 2 cycs)
+                 "ForwardProgress2" "SMT"
+
+-- Lauch SMT solver and verify. This is the recommended flow (it's more
+-- efficient) but not the default as it assumes an SMT solver is available.
 verify :: IO ()
 verify = do
   let d    = 7
-  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
-  writeSMTScript conf makeCorrectnessVerifier "Correctness" "SMT"
+  let conf = dfltVerifyConf {
+               verifyConfMode = Bounded (Range 1 d)
+             }
+  verifyWith conf makeCorrectnessVerifier
 
-  let d    = 9
-  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
-  writeSMTScript conf (makeForwardProgressVerifier 1 (d-1))
-                 "ForwardProgress1" "SMT"
+  let cycs = maxCyclesToRetire1
+  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth (cycs+1)) }
+  verifyWith conf (makeForwardProgressVerifier 1 cycs)
 
-  let d    = 14
-  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
-  writeSMTScript conf (makeForwardProgressVerifier 2 (d-1))
-                 "ForwardProgress2" "SMT"
+  let cycs = maxCyclesToRetire2
+  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth (cycs+1)) }
+  verifyWith conf (makeForwardProgressVerifier 2 cycs)

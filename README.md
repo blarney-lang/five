@@ -47,15 +47,16 @@ make shell
 To generate SMT formulae capturing the correctness of the pipeline:
 
 ```sh
-cabal run
+cabal run blarney-five-gen
 ```
 
-The formulae are written to the `SMT/` directory. To run these through
-the z3 solver:
+The formulae are written to the `SMT/` directory. Each `.smt` file can be
+passed to the z3 solver, and should evaluate to `unsat`, i.e. no
+counterexamples are found.
+
+If z3 is in your `PATH` then we recommend using the following command, which
+verifies the properties directly and incrementally.
 
 ```sh
-make verify
-```
+cabal run blarney-five-verify
 
-Each property should evaluate to `unsat`, i.e. no counterexamples are
-found.
