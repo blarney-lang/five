@@ -2,8 +2,7 @@
 
 Five is a standalone implementation of the classic five-stage
 processor pipeline that can be understood and verified independently of
-any particular instruction set. That said, we do provide a RISC-V
-microcontroller called
+any particular instruction set. We provide a RISC-V microcontroller called
 [FiveAlive](https://github.com/blarney-lang/five-alive) that
 demonstrates use of the pipeline in an actual processor core.  Five is
 written in Haskell using the
