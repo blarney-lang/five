@@ -9,18 +9,15 @@ import Blarney.Five.Interface
 -- ===================
 
 -- Basic register file with data hazard detection/stall
-makeBasicRegFile :: (Bits instr, KnownNat xlen, KnownNat lregs)
-  => RegMem lregs xlen
-  -> InstrSet xlen ilen instr lregs mreq
-  -> PipelineState xlen instr
-  -> Module (RF xlen instr)
-makeBasicRegFile regMem instrSet s = do
+makeBasicRegFile :: RegMem lregs xlen ->
+  PipelineComponent xlen ilen instr lregs mreq (RF xlen instr)
+makeBasicRegFile regMem p s = do
   stall <- makeWire false
 
   always do
     -- Monitor writeback stage and perform writes
     when s.wbActive.val do
-      let rd = instrSet.getDest s.wbInstr.val
+      let rd = p.instrSet.getDest s.wbInstr.val
       when rd.valid do
         regMem.store rd.val s.wbResult.val
 
@@ -28,7 +25,7 @@ makeBasicRegFile regMem instrSet s = do
     RF {
       submit = \instr -> do
         -- Load operands
-        let rss = instrSet.getSrcs instr
+        let rss = p.instrSet.getSrcs instr
         regMem.load (map (.val) rss)
         -- Stall if register file does not hold latest value
         stall <== orList (map hazard rss)
@@ -45,24 +42,21 @@ makeBasicRegFile regMem instrSet s = do
 
     -- Does given instruction write to given reg?
     instr `writes` reg = rd.valid .&&. rd.val .==. reg
-      where rd = instrSet.getDest instr.val
+      where rd = p.instrSet.getDest instr.val
 
 -- Forwarding register file
 -- ========================
 
 -- Forwarding register file with load hazard detection/stall
-makeForwardingRegFile :: (Bits instr, KnownNat xlen, KnownNat lregs)
-  => RegMem lregs xlen
-  -> InstrSet xlen ilen instr lregs mreq
-  -> PipelineState xlen instr
-  -> Module (RF xlen instr)
-makeForwardingRegFile regMem instrSet s = do
+makeForwardingRegFile :: RegMem lregs xlen ->
+  PipelineComponent xlen ilen instr lregs mreq (RF xlen instr)
+makeForwardingRegFile regMem p s = do
   stall <- makeWire false
 
   always do
     -- Monitor writeback stage and perform writes
     when s.wbActive.val do
-      let rd = instrSet.getDest s.wbInstr.val
+      let rd = p.instrSet.getDest s.wbInstr.val
       when rd.valid do
         regMem.store rd.val s.wbResult.val
 
@@ -70,12 +64,12 @@ makeForwardingRegFile regMem instrSet s = do
     RF {
       submit = \instr -> do
         -- Load operands
-        let rss = instrSet.getSrcs instr
+        let rss = p.instrSet.getSrcs instr
         regMem.load (map (.val) rss)
         -- Stall if register file does not hold latest value
         stall <== orList (map hazard rss)
     , operands =
-        let rss = instrSet.getSrcs s.execInstr.val in
+        let rss = p.instrSet.getSrcs s.execInstr.val in
           zipWith forward (map (.val) rss) regMem.outs
     , stall = stall.val
     }
@@ -88,10 +82,10 @@ makeForwardingRegFile regMem instrSet s = do
 
     -- Does given instruction write to given reg?
     instr `writes` reg = rd.valid .&&. rd.val .==. reg
-      where rd = instrSet.getDest instr.val
+      where rd = p.instrSet.getDest instr.val
 
     -- Does given instruction load from memory into given reg?
-    instr `loads` reg = instrSet.isMemAccess instr.val .&&.
+    instr `loads` reg = p.instrSet.isMemAccess instr.val .&&.
                           instr `writes` reg
 
     -- Get latest value of given register

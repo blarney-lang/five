@@ -9,16 +9,13 @@ import Blarney.Five.Interface
 
 -- Naive predictor always predicts the next instruction
 makeNaivePredictor ::
-     KnownNat xlen
-  => Bit xlen
-  -> PipelineState xlen instr
-  -> Module (BranchPred xlen)
-makeNaivePredictor instrLen s = do
+  PipelineComponent xlen ilen instr lregs mreq (BranchPred xlen)
+makeNaivePredictor p s = do
   predPC <- makeReg dontCare
   return
     BranchPred {
       predict = \fetchPC -> do
-        predPC <== fetchPC + instrLen
+        predPC <== fetchPC + fromInteger (2 ^ p.logInstrBytes)
     , out = predPC.val
     }
 
@@ -27,10 +24,8 @@ makeNaivePredictor instrLen s = do
 
 -- Predict using a universtally-quantified variable, for verification
 makeArbitraryPredictor ::
-     KnownNat xlen
-  => PipelineState xlen instr
-  -> Module (BranchPred xlen)
-makeArbitraryPredictor s = do
+  PipelineComponent xlen ilen instr lregs mreq (BranchPred xlen)
+makeArbitraryPredictor p s = do
   return
     BranchPred {
       predict = \fetchPC -> return ()
@@ -53,26 +48,22 @@ data BTBEntry xlen =
   deriving (Generic, Bits)
 
 -- Create BTB-based predictor using BTB with 2^n entries
-makeBTBPredictor :: forall n xlen ilen instr lregs mreq.
-     (KnownNat n, KnownNat xlen)
-  => Int
-  -> InstrSet xlen ilen instr lregs mreq
-  -> PipelineState xlen instr
-  -> Module (BranchPred xlen)
-makeBTBPredictor logInstrBytes instrSet s = do
+makeBTBPredictor :: forall n xlen ilen instr lregs mreq. KnownNat n =>
+  PipelineComponent xlen ilen instr lregs mreq (BranchPred xlen) 
+makeBTBPredictor p s = do
   -- Branch target buffer
   btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
 
   -- BTB entry being looked up
   lookup <- makeReg dontCare
 
-  -- Function to map PC to RAM index
+  -- Function to map PC to BTB index
   let getIdx :: Bit xlen -> Bit n
-      getIdx = untypedSlice (valueOf @n + logInstrBytes - 1, logInstrBytes)
+      getIdx = untypedSlice (valueOf @n + p.logInstrBytes - 1, p.logInstrBytes)
 
   -- Update BTB
   always do
-    when (instrSet.canBranch s.execInstr.val) do
+    when (p.instrSet.canBranch s.execInstr.val) do
       btb.store (getIdx s.execPC.val)
         BTBEntry {
           valid = s.execBranch.active
@@ -87,5 +78,5 @@ makeBTBPredictor logInstrBytes instrSet s = do
         lookup <== fetchPC
     , out = if btb.out.valid .&&. btb.out.pc .==. lookup.val
               then btb.out.target
-              else lookup.val + fromInteger (2 ^ logInstrBytes)
+              else lookup.val + fromInteger (2 ^ p.logInstrBytes)
     }

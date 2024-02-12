@@ -173,15 +173,15 @@ makeCorrectnessVerifier = mdo
                               (.hasResp) (.uid)
   rmem <- if enRegFwd then makeForwardingRegMem numSrcs
                       else makeRegMem numSrcs
-  bpred <- makeArbitraryPredictor s
+  bpred <- makeArbitraryPredictor params s
   exec  <- makeGoldenExecUnit 0 1 True
   let iset = v_instrSet exec
-  rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
-                       else makeBasicRegFile rmem iset s
+  rf    <- if enRegFwd then makeForwardingRegFile rmem params s
+                       else makeBasicRegFile rmem params s
   let params = 
         PipelineParams {
           initPC         = 0
-        , instrLen       = 1
+        , logInstrBytes  = 0
         , imem           = imem
         , dmem           = dmem
         , instrSet       = iset
@@ -197,17 +197,17 @@ makeForwardProgressVerifier :: Int -> Int -> Module ()
 makeForwardProgressVerifier n d = mdo
   imem  <- makeMapFilterServer true true (const true) id
   dmem  <- makeMapFilterServer true true (.hasResp) (.uid)
-  bpred <- makeArbitraryPredictor s
+  bpred <- makeArbitraryPredictor params s
   rmem  <- if enRegFwd then makeForwardingRegMem numSrcs
                        else makeRegMem numSrcs
   exec  <- makeGoldenExecUnit 0 1 False
   let iset = v_instrSet exec
-  rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
-                       else makeBasicRegFile rmem iset s
+  rf    <- if enRegFwd then makeForwardingRegFile rmem params s
+                       else makeBasicRegFile rmem params s
   let params =
         PipelineParams {
           initPC         = 0
-        , instrLen       = 1
+        , logInstrBytes  = 0
         , imem           = imem
         , dmem           = dmem
         , instrSet       = iset

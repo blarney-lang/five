@@ -55,7 +55,7 @@ data PipelineParams xlen ilen instr lregs mreq =
     -- Initial PC
     initPC :: Bit xlen
     -- Instruction size in bytes
-  , instrLen :: Bit xlen
+  , logInstrBytes :: Int
     -- Instruction set definition
   , instrSet :: InstrSet xlen ilen instr lregs mreq
     -- Interfaces to instruction and data memories
@@ -139,3 +139,13 @@ data PipelineState xlen instr =
   , wbInstr :: Reg instr
   , wbResult :: Reg (Bit xlen)
   }
+
+-- Pipeline components
+-- ===================
+
+-- Each pipeline component stage has the following type
+type PipelineComponent xlen ilen instr lregs mreq a =
+       (KnownNat xlen, Bits instr, KnownNat lregs, Bits mreq)
+    => PipelineParams xlen ilen instr lregs mreq
+    -> PipelineState xlen instr
+    -> Module a

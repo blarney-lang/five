@@ -39,20 +39,10 @@ makePipelineState p = do
   wbResult       <- makeReg dontCare
   return (PipelineState {..})
 
--- Pipeline stages
--- ===============
-
--- Each pipeline stage has the following type
-type PipelineStage xlen ilen instr lregs mreq =
-  (KnownNat xlen, Bits instr, Bits mreq) =>
-       PipelineParams xlen ilen instr lregs mreq
-    -> PipelineState xlen instr
-    -> Module ()
-
 -- Stage 1: instruction fetch
 -- ==========================
 
-fetch :: PipelineStage xlen ilen instr lregs mreq
+fetch :: PipelineComponent xlen ilen instr lregs mreq ()
 fetch p s =
   always do
     -- Address of instruction to fetch
@@ -72,7 +62,7 @@ fetch p s =
 -- Stage 2: instruction decode & operand fetch
 -- ===========================================
 
-decode :: PipelineStage xlen ilen instr lregs mreq
+decode :: PipelineComponent xlen ilen instr lregs mreq ()
 decode p s =
   always do
     -- Can decode stage fire?
@@ -97,7 +87,7 @@ decode p s =
 -- Stage 3: execute
 -- ================
 
-execute :: PipelineStage xlen ilen instr lregs mreq
+execute :: PipelineComponent xlen ilen instr lregs mreq ()
 execute p s = do
   -- Memory request wire, optionally written by an instruction
   memReq <- makeWire dontCare
@@ -123,8 +113,8 @@ execute p s = do
         , result   = WriteOnly (s.execResult <==)
         , memReq   = WriteOnly (memReq <==)
         }
-      s.execExpectedPC <== if s.execBranch.active
-        then s.execBranch.val else s.execPC.val + p.instrLen
+      s.execExpectedPC <== if s.execBranch.active then s.execBranch.val
+        else s.execPC.val + fromInteger (2 ^ p.logInstrBytes)
       when isMemAccess do p.dmem.reqs.put memReq.val
     -- Setup memory access stage
     when (inv s.memStall.val) do
@@ -135,7 +125,7 @@ execute p s = do
 -- Stage 4: memory access
 -- ======================
 
-memAccess :: PipelineStage xlen ilen instr lregs mreq
+memAccess :: PipelineComponent xlen ilen instr lregs mreq ()
 memAccess p s = do
   always do
     -- Do we need to wait for a memory response?
@@ -158,13 +148,13 @@ memAccess p s = do
 -- Stage 5: writeback
 -- ==================
 
-writeback :: PipelineStage xlen ilen instr lregs mreq
+writeback :: PipelineComponent xlen ilen instr lregs mreq ()
 writeback p s = return ()
 
 -- Classic 5-stage pipeline
 -- ========================
 
-makePipeline :: PipelineStage xlen ilen instr lregs mreq
+makePipeline :: PipelineComponent xlen ilen instr lregs mreq ()
 makePipeline p s = do
   fetch p s
   decode p s
