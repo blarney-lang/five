@@ -49,18 +49,18 @@ data ExecState xlen mreq =
 -- Pipeline parameters and I/O
 -- ===========================
 
--- Pipeline parameters and memory interfaces
+-- Pipeline parameters and interfaces
 data PipelineParams xlen ilen instr lregs mreq =
   PipelineParams {
     -- Initial PC
     initPC :: Bit xlen
     -- Instruction size in bytes
   , instrLen :: Bit xlen
+    -- Instruction set definition
+  , instrSet :: InstrSet xlen ilen instr lregs mreq
     -- Interfaces to instruction and data memories
   , imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
-    -- Instruction set definition
-  , instrSet :: InstrSet xlen ilen instr lregs mreq
     -- Interface to branch predictor
   , branchPred :: BranchPred xlen
     -- Interface to register file
