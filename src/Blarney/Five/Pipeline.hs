@@ -14,11 +14,9 @@ import Blarney.Five.Interface
 -- ==============
 
 -- Create pipeline state
-makePipelineState ::
-  (KnownNat xlen, Bits instr, Bits mreq) =>
-       PipelineParams xlen ilen instr lregs mreq
-    -> Module (PipelineState xlen instr)
-makePipelineState p = do
+makePipelineState :: (KnownNat xlen, Bits instr) =>
+  Bit xlen -> Module (PipelineState xlen instr)
+makePipelineState initPC = do
   decActive      <- makeReg false
   decPC          <- makeReg dontCare
   decStall       <- makeWire false
@@ -26,7 +24,7 @@ makePipelineState p = do
   execInstr      <- makeReg dontCare
   execPC         <- makeReg dontCare
   execMispredict <- makeSetResetBypass
-  execExpectedPC <- makeReg p.initPC
+  execExpectedPC <- makeReg initPC
   execStall      <- makeWire false
   execResult     <- makeWire dontCare
   execBranch     <- makeWire dontCare

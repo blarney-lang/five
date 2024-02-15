@@ -52,10 +52,8 @@ data ExecState xlen mreq =
 -- Pipeline parameters and interfaces
 data PipelineParams xlen ilen instr lregs mreq =
   PipelineParams {
-    -- Initial PC
-    initPC :: Bit xlen
     -- Instruction size in bytes
-  , logInstrBytes :: Int
+    logInstrBytes :: Int
     -- Instruction set definition
   , instrSet :: InstrSet xlen ilen instr lregs mreq
     -- Interfaces to instruction and data memories

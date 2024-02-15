@@ -180,15 +180,14 @@ makeCorrectnessVerifier = mdo
                        else makeBasicRegFile rmem params s
   let params = 
         PipelineParams {
-          initPC         = 0
-        , logInstrBytes  = 0
+          logInstrBytes  = 0
         , imem           = imem
         , dmem           = dmem
         , instrSet       = iset
         , branchPred     = bpred
         , regFile        = rf
         }
-  s <- makePipelineState params
+  s <- makePipelineState 0
   makePipeline params s
   checkNoConsecutiveMispreds s
 
@@ -206,15 +205,14 @@ makeForwardProgressVerifier n d = mdo
                        else makeBasicRegFile rmem params s
   let params =
         PipelineParams {
-          initPC         = 0
-        , logInstrBytes  = 0
+          logInstrBytes  = 0
         , imem           = imem
         , dmem           = dmem
         , instrSet       = iset
         , branchPred     = bpred
         , regFile        = rf
         }
-  s <- makePipelineState params
+  s <- makePipelineState 0
   makePipeline params s
   checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
