@@ -13,7 +13,7 @@ makeBasicRegFile ::
      RegMem lregs xlen
   -> InstrSet xlen ilen instr lregs mreq
   -> PipelineState xlen instr
-  -> Module (RF xlen instr)
+  -> Module (RegisterFile xlen instr)
 makeBasicRegFile regMem iset s = do
   stall <- makeWire false
 
@@ -25,7 +25,7 @@ makeBasicRegFile regMem iset s = do
         regMem.store rd.val s.wbResult.val
 
   return
-    RF {
+    RegisterFile {
       submit = \instr -> do
         -- Load operands
         let rss = iset.getSrcs instr
@@ -56,7 +56,7 @@ makeForwardingRegFile ::
   => RegMem lregs xlen
   -> InstrSet xlen ilen instr lregs mreq
   -> PipelineState xlen instr
-  -> Module (RF xlen instr)
+  -> Module (RegisterFile xlen instr)
 makeForwardingRegFile regMem iset s = do
   stall <- makeWire false
 
@@ -68,7 +68,7 @@ makeForwardingRegFile regMem iset s = do
         regMem.store rd.val s.wbResult.val
 
   return
-    RF {
+    RegisterFile {
       submit = \instr -> do
         -- Load operands
         let rss = iset.getSrcs instr

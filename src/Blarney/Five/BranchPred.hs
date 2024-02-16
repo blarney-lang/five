@@ -12,11 +12,11 @@ makeNaivePredictor ::
      KnownNat xlen
   => InstrSet xlen ilen instr lregs mreq
   -> PipelineState xlen instr
-  -> Module (BranchPred xlen)
+  -> Module (BranchPredictor xlen)
 makeNaivePredictor iset s = do
   predPC <- makeReg dontCare
   return
-    BranchPred {
+    BranchPredictor {
       predict = \fetchPC -> do
         predPC <== fetchPC + fromIntegral iset.incPC
     , out = predPC.val
@@ -30,10 +30,10 @@ makeArbitraryPredictor ::
      KnownNat xlen
   => InstrSet xlen ilen instr lregs mreq
   -> PipelineState xlen instr
-  -> Module (BranchPred xlen)
+  -> Module (BranchPredictor xlen)
 makeArbitraryPredictor p s = do
   return
-    BranchPred {
+    BranchPredictor {
       predict = \fetchPC -> return ()
     , out = var "predicted_pc"
     }
@@ -58,7 +58,7 @@ makeBTBPredictor :: forall n xlen ilen instr lregs mreq.
      (KnownNat n, KnownNat xlen)
   => InstrSet xlen ilen instr lregs mreq
   -> PipelineState xlen instr
-  -> Module (BranchPred xlen)
+  -> Module (BranchPredictor xlen)
 makeBTBPredictor iset s = do
   -- Branch target buffer
   btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
@@ -84,7 +84,7 @@ makeBTBPredictor iset s = do
         }
 
   return
-    BranchPred {
+    BranchPredictor {
       predict = \fetchPC -> do
         btb.load (getIdx fetchPC)
         lookup <== fetchPC

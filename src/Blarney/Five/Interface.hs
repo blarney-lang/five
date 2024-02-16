@@ -58,17 +58,17 @@ data PipelineInterface xlen ilen instr mreq =
     imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
     -- Interface to branch predictor
-  , branchPred :: BranchPred xlen
+  , branchPred :: BranchPredictor xlen
     -- Interface to register file
-  , regFile :: RF xlen instr
+  , regFile :: RegisterFile xlen instr
   }
 
 -- Branch target predictor
 -- =======================
 
 -- Interface to the branch target predictor
-data BranchPred xlen =
-  BranchPred {
+data BranchPredictor xlen =
+  BranchPredictor {
     -- Given the PC of the instruction currently being fetched,
     -- predict the PC of the next instruction to fetch.
     predict :: Bit xlen -> Action ()
@@ -81,8 +81,8 @@ data BranchPred xlen =
 -- =============
 
 -- Interface to the register file
-data RF xlen instr =
-  RF {
+data RegisterFile xlen instr =
+  RegisterFile {
     -- Submit instruction to the register file.
     submit :: instr -> Action ()
     -- The instruction operands are available one cycle after
