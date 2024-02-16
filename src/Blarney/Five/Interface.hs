@@ -48,16 +48,14 @@ data ExecState xlen mreq =
   , memReq :: WriteOnly mreq
   }
 
--- Pipeline parameters and I/O
--- ===========================
+-- Pipeline interface
+-- ==================
 
--- Pipeline parameters and interfaces
-data PipelineParams xlen ilen instr lregs mreq =
-  PipelineParams {
-    -- Instruction set definition
-    instrSet :: InstrSet xlen ilen instr lregs mreq
+-- Pipeline interface
+data PipelineInterface xlen ilen instr mreq =
+  PipelineInterface {
     -- Interfaces to instruction and data memories
-  , imem :: Server (Bit xlen) (Bit ilen)
+    imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
     -- Interface to branch predictor
   , branchPred :: BranchPred xlen
@@ -137,13 +135,3 @@ data PipelineState xlen instr =
   , wbInstr :: Reg instr
   , wbResult :: Reg (Bit xlen)
   }
-
--- Pipeline components
--- ===================
-
--- Each pipeline component stage has the following type
-type PipelineComponent xlen ilen instr lregs mreq a =
-       (KnownNat xlen, Bits instr, KnownNat lregs, Bits mreq)
-    => PipelineParams xlen ilen instr lregs mreq
-    -> PipelineState xlen instr
-    -> Module a

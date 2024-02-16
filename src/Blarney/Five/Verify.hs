@@ -173,21 +173,20 @@ makeCorrectnessVerifier = mdo
                               (.hasResp) (.uid)
   rmem <- if enRegFwd then makeForwardingRegMem numSrcs
                       else makeRegMem numSrcs
-  bpred <- makeArbitraryPredictor params s
+  bpred <- makeArbitraryPredictor iset s
   exec  <- makeGoldenExecUnit 0 1 True
   let iset = v_instrSet exec
-  rf    <- if enRegFwd then makeForwardingRegFile rmem params s
-                       else makeBasicRegFile rmem params s
-  let params = 
-        PipelineParams {
+  rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
+                       else makeBasicRegFile rmem iset s
+  let ifc = 
+        PipelineInterface {
           imem           = imem
         , dmem           = dmem
-        , instrSet       = iset
         , branchPred     = bpred
         , regFile        = rf
         }
   s <- makePipelineState 0
-  makePipeline params s
+  makePipeline ifc iset s
   checkNoConsecutiveMispreds s
 
 -- Pipeline for forward progress verification
@@ -195,23 +194,22 @@ makeForwardProgressVerifier :: Int -> Int -> Module ()
 makeForwardProgressVerifier n d = mdo
   imem  <- makeMapFilterServer true true (const true) id
   dmem  <- makeMapFilterServer true true (.hasResp) (.uid)
-  bpred <- makeArbitraryPredictor params s
+  bpred <- makeArbitraryPredictor iset s
   rmem  <- if enRegFwd then makeForwardingRegMem numSrcs
                        else makeRegMem numSrcs
   exec  <- makeGoldenExecUnit 0 1 False
   let iset = v_instrSet exec
-  rf    <- if enRegFwd then makeForwardingRegFile rmem params s
-                       else makeBasicRegFile rmem params s
-  let params =
-        PipelineParams {
+  rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
+                       else makeBasicRegFile rmem iset s
+  let ifc =
+        PipelineInterface {
           imem           = imem
         , dmem           = dmem
-        , instrSet       = iset
         , branchPred     = bpred
         , regFile        = rf
         }
   s <- makePipelineState 0
-  makePipeline params s
+  makePipeline ifc iset s
   checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
 -- Max cycles to retire 1 instruction
