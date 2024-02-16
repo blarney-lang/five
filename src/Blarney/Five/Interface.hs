@@ -20,17 +20,19 @@ data InstrSet xlen ilen instr lregs mreq =
   InstrSet {
     -- Instruction decoder
     decode :: Bit ilen -> instr
+    -- Max number of source operands per instruction
+  , numSrcs :: Int
     -- Extract source/destination registers from instruction
   , getDest :: instr -> Option (Bit lregs)
   , getSrcs :: instr -> [Option (Bit lregs)]
-    -- Max number of source operands per instruction
-  , numSrcs :: Int
     -- Will instruction issue a data memory request?
   , isMemAccess :: instr -> Bit 1
     -- Can instruction branch?
   , canBranch :: instr -> Bit 1
     -- Function to execute a given instruction
   , execute :: instr -> ExecState xlen mreq -> Action ()
+    -- Program counter increment
+  , incPC :: Int
   }
 
 -- State that can be read/written by an instruction
@@ -52,10 +54,8 @@ data ExecState xlen mreq =
 -- Pipeline parameters and interfaces
 data PipelineParams xlen ilen instr lregs mreq =
   PipelineParams {
-    -- Instruction size in bytes
-    logInstrBytes :: Int
     -- Instruction set definition
-  , instrSet :: InstrSet xlen ilen instr lregs mreq
+    instrSet :: InstrSet xlen ilen instr lregs mreq
     -- Interfaces to instruction and data memories
   , imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)

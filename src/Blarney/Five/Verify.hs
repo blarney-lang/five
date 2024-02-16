@@ -14,7 +14,6 @@ import Blarney.Five.BranchPred
 
 -- Type parameters for verification
 type V_XLen    = 3   -- Register width
-type V_ILen    = 3   -- Instruction width
 type V_LogRegs = 2   -- Log_2 of number of registers
 
 -- Number of source operands per instruction
@@ -73,12 +72,12 @@ data V_Instr =
 -- Instruction set interface for verification
 v_instrSet execute =
   InstrSet {
-    getDest     = \i -> i.rd
-  , getSrcs     = \i -> [i.rs1, i.rs2]
-  , numSrcs     = numSrcs
-  , isMemAccess = \i -> i.isMemAccess
-  , canBranch   = \i -> i.canBranch
-  , decode      = \uid ->
+    numSrcs       = numSrcs
+  , getDest       = \i -> i.rd
+  , getSrcs       = \i -> [i.rs1, i.rs2]
+  , isMemAccess   = \i -> i.isMemAccess
+  , canBranch     = \i -> i.canBranch
+  , decode        = \uid ->
       V_Instr {
         uid = uid
       , rd  = Option (var "rd_valid")  (var "rd")
@@ -88,6 +87,7 @@ v_instrSet execute =
       , canBranch = var "can_branch"
       }
   , execute     = execute
+  , incPC       = 1
   }
 
 -- Execution unit for verification
@@ -180,8 +180,7 @@ makeCorrectnessVerifier = mdo
                        else makeBasicRegFile rmem params s
   let params = 
         PipelineParams {
-          logInstrBytes  = 0
-        , imem           = imem
+          imem           = imem
         , dmem           = dmem
         , instrSet       = iset
         , branchPred     = bpred
@@ -205,8 +204,7 @@ makeForwardProgressVerifier n d = mdo
                        else makeBasicRegFile rmem params s
   let params =
         PipelineParams {
-          logInstrBytes  = 0
-        , imem           = imem
+          imem           = imem
         , dmem           = dmem
         , instrSet       = iset
         , branchPred     = bpred

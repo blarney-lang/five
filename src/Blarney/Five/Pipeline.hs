@@ -112,7 +112,7 @@ execute p s = do
         , memReq   = WriteOnly (memReq <==)
         }
       s.execExpectedPC <== if s.execBranch.active then s.execBranch.val
-        else s.execPC.val + fromInteger (2 ^ p.logInstrBytes)
+        else s.execPC.val + fromIntegral p.instrSet.incPC
       when isMemAccess do p.dmem.reqs.put memReq.val
     -- Setup memory access stage
     when (inv s.memStall.val) do

@@ -6,6 +6,13 @@ import Blarney
 var :: KnownNat n => String -> Bit n
 var = inputPin
 
+-- Base-2 logarithm with error
+log2strict :: Int -> Int
+log2strict x
+  | 2^y == x = y
+  | otherwise = error "log2: argument is not a power of 2"
+  where y = log2ceil x
+
 -- Set/reset latch interface
 data SetReset =
   SetReset {

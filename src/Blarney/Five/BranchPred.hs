@@ -8,14 +8,14 @@ import Blarney.Five.Interface
 -- =============================
 
 -- Naive predictor always predicts the next instruction
-makeNaivePredictor ::
+makeNaivePredictor :: forall xlen ilen instr lregs mreq.
   PipelineComponent xlen ilen instr lregs mreq (BranchPred xlen)
 makeNaivePredictor p s = do
   predPC <- makeReg dontCare
   return
     BranchPred {
       predict = \fetchPC -> do
-        predPC <== fetchPC + fromInteger (2 ^ p.logInstrBytes)
+        predPC <== fetchPC + fromIntegral p.instrSet.incPC
     , out = predPC.val
     }
 
@@ -57,9 +57,12 @@ makeBTBPredictor p s = do
   -- BTB entry being looked up
   lookup <- makeReg dontCare
 
+  -- Base-2 log of program counter increment
+  let iwidth = log2strict p.instrSet.incPC
+
   -- Function to map PC to BTB index
   let getIdx :: Bit xlen -> Bit n
-      getIdx = untypedSlice (valueOf @n + p.logInstrBytes - 1, p.logInstrBytes)
+      getIdx = untypedSlice (valueOf @n + iwidth - 1, iwidth)
 
   -- Update BTB
   always do
@@ -78,5 +81,5 @@ makeBTBPredictor p s = do
         lookup <== fetchPC
     , out = if btb.out.valid .&&. btb.out.pc .==. lookup.val
               then btb.out.target
-              else lookup.val + fromInteger (2 ^ p.logInstrBytes)
+              else lookup.val + fromIntegral p.instrSet.incPC
     }
