@@ -1,4 +1,3 @@
--- TODO: consider suffixing reg fields with _r and/or wire fields with _w
 -- TODO: consider using vectors instead of lists
 
 module Blarney.Five.Pipeline where
