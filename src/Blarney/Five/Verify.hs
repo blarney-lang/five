@@ -75,7 +75,6 @@ v_instrSet execute =
     getDest       = \i -> i.rd
   , getSrcs       = \i -> [i.rs1, i.rs2]
   , isMemAccess   = \i -> i.isMemAccess
-  , canBranch     = \i -> i.canBranch
   , decode        = \uid ->
       V_Instr {
         uid = uid

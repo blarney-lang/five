@@ -25,8 +25,6 @@ data InstrSet xlen ilen instr lregs mreq =
   , getSrcs :: instr -> [Option (Bit lregs)]
     -- Will instruction issue a data memory request?
   , isMemAccess :: instr -> Bit 1
-    -- Can instruction branch?
-  , canBranch :: instr -> Bit 1
     -- Function to execute a given instruction
   , execute :: instr -> ExecState xlen mreq -> Action ()
     -- Program counter increment

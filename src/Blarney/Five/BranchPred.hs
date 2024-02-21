@@ -31,7 +31,7 @@ makeArbitraryPredictor ::
   => InstrSet xlen ilen instr lregs mreq
   -> PipelineState xlen instr
   -> Module (BranchPredictor xlen)
-makeArbitraryPredictor p s = do
+makeArbitraryPredictor iset s = do
   return
     BranchPredictor {
       predict = \fetchPC -> return ()
@@ -56,10 +56,11 @@ data BTBEntry xlen =
 -- Create BTB-based predictor using BTB with 2^n entries
 makeBTBPredictor :: forall n xlen ilen instr lregs mreq.
      (KnownNat n, KnownNat xlen)
-  => InstrSet xlen ilen instr lregs mreq
+  => (instr -> Bit 1)
+  -> InstrSet xlen ilen instr lregs mreq
   -> PipelineState xlen instr
   -> Module (BranchPredictor xlen)
-makeBTBPredictor iset s = do
+makeBTBPredictor canBranch iset s = do
   -- Branch target buffer
   btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
 
@@ -75,7 +76,7 @@ makeBTBPredictor iset s = do
 
   -- Update BTB
   always do
-    when (iset.canBranch s.execInstr.val) do
+    when (canBranch s.execInstr.val) do
       btb.store (getIdx s.execPC.val)
         BTBEntry {
           valid = s.execBranch_w.active
