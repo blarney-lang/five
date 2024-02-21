@@ -1,5 +1,3 @@
--- TODO: consider using vectors instead of lists
-
 module Blarney.Five.Pipeline where
   
 import Blarney

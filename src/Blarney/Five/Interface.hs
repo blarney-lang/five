@@ -20,8 +20,6 @@ data InstrSet xlen ilen instr lregs mreq =
   InstrSet {
     -- Instruction decoder
     decode :: Bit ilen -> instr
-    -- Max number of source operands per instruction
-  , numSrcs :: Int
     -- Extract source/destination registers from instruction
   , getDest :: instr -> Option (Bit lregs)
   , getSrcs :: instr -> [Option (Bit lregs)]

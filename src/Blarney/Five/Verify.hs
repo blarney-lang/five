@@ -72,8 +72,7 @@ data V_Instr =
 -- Instruction set interface for verification
 v_instrSet execute =
   InstrSet {
-    numSrcs       = numSrcs
-  , getDest       = \i -> i.rd
+    getDest       = \i -> i.rd
   , getSrcs       = \i -> [i.rs1, i.rs2]
   , isMemAccess   = \i -> i.isMemAccess
   , canBranch     = \i -> i.canBranch
