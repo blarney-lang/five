@@ -85,7 +85,7 @@ makeForwardingRegFile regMem iset s = do
     -- Is there a data hazard reading given register?
     hazard reg = reg.valid .&&.
          ( s.execActive.val .&&. s.execInstr `loads` reg.val
-      .||. s.memStall.val   .&&. s.memInstr  `loads` reg.val )
+      .||. s.memStall_w.val   .&&. s.memInstr  `loads` reg.val )
 
     -- Does given instruction write to given reg?
     instr `writes` reg = rd.valid .&&. rd.val .==. reg
@@ -97,6 +97,7 @@ makeForwardingRegFile regMem iset s = do
 
     -- Get latest value of given register
     forward reg fromRF =
-      if s.memActive.val .&&. s.memInstr `writes` reg then s.memResult.val
-        else if s.wbActive.val .&&. s.wbInstr `writes` reg then s.wbResult.val
-          else fromRF
+      if s.memActive.val .&&. s.memInstr `writes` reg
+         then s.memResult.val
+         else if s.wbActive.val .&&. s.wbInstr `writes` reg
+                then s.wbResult.val else fromRF

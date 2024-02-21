@@ -21,19 +21,19 @@ makePipelineState ::
 makePipelineState initPC = do
   decActive      <- makeReg false
   decPC          <- makeReg dontCare
-  decStall       <- makeWire false
+  decStall_w     <- makeWire false
   execActive     <- makeReg false
   execInstr      <- makeReg dontCare
   execPC         <- makeReg dontCare
   execMispredict <- makeSetResetBypass
   execExpectedPC <- makeReg initPC
-  execStall      <- makeWire false
-  execResult     <- makeWire dontCare
-  execBranch     <- makeWire dontCare
+  execStall_w    <- makeWire false
+  execResult_w   <- makeWire dontCare
+  execBranch_w   <- makeWire dontCare
   memActive      <- makeReg false
   memInstr       <- makeReg dontCare
   memResult      <- makeReg dontCare
-  memStall       <- makeWire false
+  memStall_w     <- makeWire false
   wbActive       <- makeReg false
   wbInstr        <- makeReg dontCare
   wbResult       <- makeReg dontCare
@@ -59,7 +59,7 @@ fetch ifc iset s = always do
         then s.execExpectedPC.val
         else ifc.branchPred.out
   -- Setup decode stage
-  when (inv s.decStall.val) do
+  when (inv s.decStall_w.val) do
     s.decActive <== ifc.imem.reqs.canPut
     s.decPC <== fetchPC
     -- Issue imem request
@@ -75,17 +75,17 @@ decode :: PipelineStage xlen ilen instr lregs mreq
 decode ifc iset s = always do
   -- Can decode stage fire?
   let canFire = ifc.imem.resps.canPeek
-           .&&. inv s.execStall.val
+           .&&. inv s.execStall_w.val
            .&&. inv ifc.regFile.stall
   -- Issue stall to earlier stage
-  s.decStall <== s.decActive.val .&&. inv canFire
+  s.decStall_w <== s.decActive.val .&&. inv canFire
   -- Decode instruction
   let instr = iset.decode ifc.imem.resps.peek
   -- Setup execute stage and consume imem response
-  when (inv s.execStall.val) do
+  when (inv s.execStall_w.val) do
     s.execActive <== s.decActive.val
-                .&&. canFire
-                .&&. inv s.execMispredict.val
+                  .&&. canFire
+                  .&&. inv s.execMispredict.val
     s.execInstr <== instr
     s.execPC <== s.decPC.val
     when ifc.imem.resps.canPeek do
@@ -101,9 +101,9 @@ execute ifc iset s = always do
   let isMemAccess = iset.isMemAccess s.execInstr.val
   let waitForMem = isMemAccess .&&. inv ifc.dmem.reqs.canPut
   -- Can decode stage fire?
-  let canFire = inv s.memStall.val .&&. inv waitForMem
+  let canFire = inv s.memStall_w.val .&&. inv waitForMem
   -- Issue stall to earlier stages
-  s.execStall <== s.execActive.val .&&. inv canFire
+  s.execStall_w <== s.execActive.val .&&. inv canFire
   -- Look for misprediction
   let mispredict = s.execPC.val .!=. s.execExpectedPC.val
   when (s.execActive.val .&&. mispredict) do s.execMispredict.set
@@ -112,18 +112,18 @@ execute ifc iset s = always do
   when fire do
     iset.execute s.execInstr.val
       ExecState {
-        pc       = ReadWrite s.execPC.val (s.execBranch <==)
+        pc       = ReadWrite s.execPC.val (s.execBranch_w <==)
       , operands = ifc.regFile.operands
-      , result   = WriteOnly (s.execResult <==)
+      , result   = WriteOnly (s.execResult_w <==)
       , memReq   = WriteOnly ifc.dmem.reqs.put
       }
-    s.execExpectedPC <== if s.execBranch.active then s.execBranch.val
+    s.execExpectedPC <== if s.execBranch_w.active then s.execBranch_w.val
       else s.execPC.val + fromIntegral iset.incPC
   -- Setup memory access stage
-  when (inv s.memStall.val) do
+  when (inv s.memStall_w.val) do
     s.memActive <== fire
     s.memInstr <== s.execInstr.val
-    s.memResult <== s.execResult.val
+    s.memResult <== s.execResult_w.val
 
 -- Stage 4: memory access
 -- ======================
@@ -137,7 +137,7 @@ memAccess ifc iset s = always do
   -- Issue stall to earlier stages
   let stall = if s.memActive.val .&&. waitResp
         then inv ifc.dmem.resps.canPeek else false
-  s.memStall <== stall
+  s.memStall_w <== stall
   -- Setup writeback stage and consume dmem response
   s.wbActive <== s.memActive.val .&&. inv stall
   s.wbInstr <== s.memInstr.val

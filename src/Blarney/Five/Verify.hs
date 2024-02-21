@@ -139,7 +139,7 @@ checkNoConsecutiveMispreds s = do
   mispreds :: Reg (Bit 2) <- makeReg 0
 
   always do
-    when (s.execActive.val .&&. inv s.execStall.val) do
+    when (s.execActive.val .&&. inv s.execStall_w.val) do
       if s.execMispredict.val
         then mispreds <== mispreds.val + 1
         else mispreds <== 0

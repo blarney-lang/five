@@ -98,7 +98,8 @@ data RegisterFile xlen instr =
 -- ==============
 
 -- Pipeline state parameterised by register size in bits (xlen)
--- and decoded instruction format (instr).
+-- and decoded instruction format (instr). By convention, we suffix
+-- wire field names with "_w".
 data PipelineState xlen instr =
   PipelineState {
     -- Is the decode stage active?
@@ -106,7 +107,7 @@ data PipelineState xlen instr =
     -- If so, the PC of the instruction in the decode stage.
   , decPC :: Reg (Bit xlen)
     -- Is the decode stage stalling?
-  , decStall :: Wire (Bit 1)
+  , decStall_w :: Wire (Bit 1)
     -- Is the execute stage active?
   , execActive :: Reg (Bit 1)
     -- If so, the instruction to execute with its PC and operands.
@@ -117,18 +118,18 @@ data PipelineState xlen instr =
     -- Is the instruction in the execute stage mispredicted?
   , execMispredict :: SetReset
     -- Is the execute stage stalling?
-  , execStall :: Wire (Bit 1)
+  , execStall_w :: Wire (Bit 1)
     -- Instruction result
-  , execResult :: Wire (Bit xlen)
+  , execResult_w :: Wire (Bit xlen)
     -- Branch target of executed instruction
-  , execBranch :: Wire (Bit xlen)
+  , execBranch_w :: Wire (Bit xlen)
     -- Is the memory access stage active?
   , memActive :: Reg (Bit 1)
     -- If so, the instruction and its result
   , memInstr :: Reg instr
   , memResult :: Reg (Bit xlen)
     -- Is the memory access stage stalling?
-  , memStall :: Wire (Bit 1)
+  , memStall_w :: Wire (Bit 1)
     -- Is the writeback stage active?
   , wbActive :: Reg (Bit 1)
     -- If so, the instruction and its result.

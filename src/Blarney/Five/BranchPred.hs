@@ -78,9 +78,9 @@ makeBTBPredictor iset s = do
     when (iset.canBranch s.execInstr.val) do
       btb.store (getIdx s.execPC.val)
         BTBEntry {
-          valid = s.execBranch.active
+          valid = s.execBranch_w.active
         , pc = s.execPC.val
-        , target = s.execBranch.val
+        , target = s.execBranch_w.val
         }
 
   return
