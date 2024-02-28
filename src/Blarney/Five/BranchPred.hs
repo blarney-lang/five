@@ -19,7 +19,7 @@ makeNaivePredictor iset s = do
     BranchPredictor {
       predict = \fetchPC -> do
         predPC <== fetchPC + fromIntegral iset.incPC
-    , out = predPC.val
+    , val = predPC.val
     }
 
 -- Arbirarty predictor for verification
@@ -35,7 +35,7 @@ makeArbitraryPredictor iset s = do
   return
     BranchPredictor {
       predict = \fetchPC -> return ()
-    , out = var "predicted_pc"
+    , val = var "predicted_pc"
     }
 
 -- Branch target predictor using BTB
@@ -89,7 +89,7 @@ makeBTBPredictor canBranch iset s = do
       predict = \fetchPC -> do
         btb.load (getIdx fetchPC)
         lookup <== fetchPC
-    , out = if btb.out.valid .&&. btb.out.pc .==. lookup.val
+    , val = if btb.out.valid .&&. btb.out.pc .==. lookup.val
               then btb.out.target
               else lookup.val + fromIntegral iset.incPC
     }

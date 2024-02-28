@@ -41,8 +41,8 @@ makePipelineState initPC = do
 
 type PipelineStage xlen ilen instr lregs mreq =
      (KnownNat xlen, Bits instr, Bits mreq)
-  => PipelineInterface xlen ilen instr mreq
-  -> InstrSet xlen ilen instr lregs mreq
+  => InstrSet xlen ilen instr lregs mreq
+  -> PipelineParams xlen ilen instr mreq
   -> PipelineState xlen instr
   -> Module ()
 
@@ -50,34 +50,34 @@ type PipelineStage xlen ilen instr lregs mreq =
 -- ==========================
 
 fetch :: PipelineStage xlen ilen instr lregs mreq
-fetch ifc iset s = always do
+fetch iset p s = always do
   -- Address of instruction to fetch
   let fetchPC = if s.execMispredict.val
         then s.execExpectedPC.val
-        else ifc.branchPred.out
+        else p.branchPred.val
   -- Setup decode stage
   when (inv s.decStall_w.val) do
-    s.decActive <== ifc.imem.reqs.canPut
+    s.decActive <== p.imem.reqs.canPut
     s.decPC <== fetchPC
     -- Issue imem request
-    when ifc.imem.reqs.canPut do
-      ifc.imem.reqs.put fetchPC
-      ifc.branchPred.predict fetchPC
+    when p.imem.reqs.canPut do
+      p.imem.reqs.put fetchPC
+      p.branchPred.predict fetchPC
       s.execMispredict.reset
 
 -- Stage 2: instruction decode & operand fetch
 -- ===========================================
 
 decode :: PipelineStage xlen ilen instr lregs mreq
-decode ifc iset s = always do
+decode iset p s = always do
   -- Can decode stage fire?
-  let canFire = ifc.imem.resps.canPeek
+  let canFire = p.imem.resps.canPeek
            .&&. inv s.execStall_w.val
-           .&&. inv ifc.regFile.stall
+           .&&. inv p.regFile.stall
   -- Issue stall to earlier stage
   s.decStall_w <== s.decActive.val .&&. inv canFire
   -- Decode instruction
-  let instr = iset.decode ifc.imem.resps.peek
+  let instr = iset.decode p.imem.resps.peek
   -- Setup execute stage and consume imem response
   when (inv s.execStall_w.val) do
     s.execActive <== s.decActive.val
@@ -85,18 +85,18 @@ decode ifc iset s = always do
                   .&&. inv s.execMispredict.val
     s.execInstr <== instr
     s.execPC <== s.decPC.val
-    when ifc.imem.resps.canPeek do
-      ifc.regFile.submit instr
-      when (inv ifc.regFile.stall) do ifc.imem.resps.consume
+    when p.imem.resps.canPeek do
+      p.regFile.submit instr
+      when (inv p.regFile.stall) do p.imem.resps.consume
 
 -- Stage 3: execute
 -- ================
 
 execute :: PipelineStage xlen ilen instr lregs mreq
-execute ifc iset s = always do
+execute iset p s = always do
   -- Is memory ready for a new request?
   let isMemAccess = iset.isMemAccess s.execInstr.val
-  let waitForMem = isMemAccess .&&. inv ifc.dmem.reqs.canPut
+  let waitForMem = isMemAccess .&&. inv p.dmem.reqs.canPut
   -- Can decode stage fire?
   let canFire = inv s.memStall_w.val .&&. inv waitForMem
   -- Issue stall to earlier stages
@@ -110,9 +110,9 @@ execute ifc iset s = always do
     iset.execute s.execInstr.val
       ExecState {
         pc       = ReadWrite s.execPC.val (s.execBranch_w <==)
-      , operands = ifc.regFile.operands
+      , operands = p.regFile.operands
       , result   = WriteOnly (s.execResult_w <==)
-      , memReq   = WriteOnly ifc.dmem.reqs.put
+      , memReq   = WriteOnly p.dmem.reqs.put
       }
     s.execExpectedPC <== if s.execBranch_w.active then s.execBranch_w.val
       else s.execPC.val + fromIntegral iset.incPC
@@ -126,37 +126,37 @@ execute ifc iset s = always do
 -- ======================
 
 memAccess :: PipelineStage xlen ilen instr lregs mreq
-memAccess ifc iset s = always do
+memAccess iset p s = always do
   -- Do we need to wait for a memory response?
   let rd = iset.getDest s.memInstr.val
   let isMemAccess = iset.isMemAccess s.memInstr.val
   let waitResp = if isMemAccess then rd.valid else false
   -- Issue stall to earlier stages
   let stall = if s.memActive.val .&&. waitResp
-        then inv ifc.dmem.resps.canPeek else false
+        then inv p.dmem.resps.canPeek else false
   s.memStall_w <== stall
   -- Setup writeback stage and consume dmem response
   s.wbActive <== s.memActive.val .&&. inv stall
   s.wbInstr <== s.memInstr.val
   if waitResp
-    then when ifc.dmem.resps.canPeek do
-           ifc.dmem.resps.consume
-           s.wbResult <== ifc.dmem.resps.peek
+    then when p.dmem.resps.canPeek do
+           p.dmem.resps.consume
+           s.wbResult <== p.dmem.resps.peek
     else s.wbResult <== s.memResult.val
 
 -- Stage 5: writeback
 -- ==================
 
 writeback :: PipelineStage xlen ilen instr lregs mreq
-writeback ifc iset s = return ()
+writeback iset p s = return ()
 
 -- Classic 5-stage pipeline
 -- ========================
 
 makePipeline :: PipelineStage xlen ilen instr lregs mreq
-makePipeline ifc iset s = do
-  fetch ifc iset s
-  decode ifc iset s
-  execute ifc iset s
-  memAccess ifc iset s
-  writeback ifc iset s
+makePipeline iset p s = do
+  fetch iset p s
+  decode iset p s
+  execute iset p s
+  memAccess iset p s
+  writeback iset p s

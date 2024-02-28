@@ -44,12 +44,12 @@ data ExecState xlen mreq =
   , memReq :: WriteOnly mreq
   }
 
--- Pipeline interface
--- ==================
+-- Pipeline parameters
+-- ===================
 
--- Pipeline interface
-data PipelineInterface xlen ilen instr mreq =
-  PipelineInterface {
+-- Pipeline parameters
+data PipelineParams xlen ilen instr mreq =
+  PipelineParams {
     -- Interfaces to instruction and data memories
     imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
@@ -70,7 +70,7 @@ data BranchPredictor xlen =
     predict :: Bit xlen -> Action ()
     -- The prediction is available one cycle after calling predict and
     -- will remain stable until predict is called again.
-  , out :: Bit xlen
+  , val :: Bit xlen
   }
 
 -- Register file

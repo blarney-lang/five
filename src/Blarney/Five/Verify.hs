@@ -176,15 +176,15 @@ makeCorrectnessVerifier = mdo
   let iset = v_instrSet exec
   rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
                        else makeBasicRegFile rmem iset s
-  let ifc = 
-        PipelineInterface {
+  let params = 
+        PipelineParams {
           imem           = imem
         , dmem           = dmem
         , branchPred     = bpred
         , regFile        = rf
         }
   s <- makePipelineState 0
-  makePipeline ifc iset s
+  makePipeline iset params s
   checkNoConsecutiveMispreds s
 
 -- Pipeline for forward progress verification
@@ -199,15 +199,15 @@ makeForwardProgressVerifier n d = mdo
   let iset = v_instrSet exec
   rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
                        else makeBasicRegFile rmem iset s
-  let ifc =
-        PipelineInterface {
+  let params =
+        PipelineParams {
           imem           = imem
         , dmem           = dmem
         , branchPred     = bpred
         , regFile        = rf
         }
   s <- makePipelineState 0
-  makePipeline ifc iset s
+  makePipeline iset params s
   checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
 -- Max cycles to retire 1 instruction
