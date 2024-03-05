@@ -29,6 +29,8 @@ data InstrSet xlen ilen instr lregs mreq =
   , execute :: instr -> ExecState xlen mreq -> Action ()
     -- Program counter increment
   , incPC :: Int
+    -- For branch predictor: can given instruction branch?
+  , canBranch :: instr -> Bit 1
   }
 
 -- State that can be read/written by an instruction
@@ -48,30 +50,38 @@ data ExecState xlen mreq =
 -- ===================
 
 -- Pipeline parameters
-data PipelineParams xlen ilen instr mreq =
+data PipelineParams xlen ilen instr lregs mreq =
   PipelineParams {
+    -- Information about the instruction set
+    iset :: InstrSet xlen ilen instr lregs mreq
     -- Interfaces to instruction and data memories
-    imem :: Server (Bit xlen) (Bit ilen)
+  , imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
-    -- Interface to branch predictor
-  , branchPred :: BranchPredictor xlen
-    -- Interface to register file
-  , regFile :: RegisterFile xlen instr
+    -- Register file parameters
+  , regFileParams :: RegisterFileParams
+    -- Branch prediction method
+  , branchPredMethod :: BranchPredictionMethod
   }
 
--- Branch target predictor
--- =======================
-
--- Interface to the branch target predictor
-data BranchPredictor xlen =
-  BranchPredictor {
-    -- Given the PC of the instruction currently being fetched,
-    -- predict the PC of the next instruction to fetch.
-    predict :: Bit xlen -> Action ()
-    -- The prediction is available one cycle after calling predict and
-    -- will remain stable until predict is called again.
-  , val :: Bit xlen
+-- Register file parameters
+data RegisterFileParams =
+  RegisterFileParams {
+    -- Enable register forwarding?
+    useForwarding :: Bool
+    -- Use onchip RAM rather than FFs?
+  , useRAM :: Bool
+    -- Number of read ports
+  , numReadPorts :: Int
   }
+
+-- Branch prediction method
+data BranchPredictionMethod =
+    -- Arbitrary predictor for verification
+    ArbitraryPredictor
+    -- Always predict branch-not-taken
+  | NaivePredictor
+    -- Prediction using a branch target buffer with 2^n entries
+  | BTBPredictor Int
 
 -- Register file
 -- =============
@@ -90,20 +100,37 @@ data RegisterFile xlen instr =
   , stall :: Bit 1
   }
 
+-- Branch predictor
+-- ================
+
+-- Interface to the branch predictor
+data BranchPredictor xlen =
+  BranchPredictor {
+    -- Given the PC of the instruction currently being fetched,
+    -- predict the PC of the next instruction to fetch.
+    predict :: Bit xlen -> Action ()
+    -- The prediction is available one cycle after calling predict and
+    -- will remain stable until predict is called again.
+  , val :: Bit xlen
+  }
+
 -- Pipeline state
 -- ==============
 
--- Pipeline state parameterised by register size in bits (xlen)
--- and decoded instruction format (instr). By convention, we suffix
--- wire field names with "_w".
+-- Pipeline state. By convention, we suffix wire field names with "_w".
 data PipelineState xlen instr =
   PipelineState {
+    -- Decode
+    -- ======
     -- Is the decode stage active?
     decActive :: Reg (Bit 1)
     -- If so, the PC of the instruction in the decode stage.
   , decPC :: Reg (Bit xlen)
     -- Is the decode stage stalling?
   , decStall_w :: Wire (Bit 1)
+
+    -- Execute
+    -- =======
     -- Is the execute stage active?
   , execActive :: Reg (Bit 1)
     -- If so, the instruction to execute with its PC and operands.
@@ -119,6 +146,9 @@ data PipelineState xlen instr =
   , execResult_w :: Wire (Bit xlen)
     -- Branch target of executed instruction
   , execBranch_w :: Wire (Bit xlen)
+
+    -- Memory Access
+    -- =============
     -- Is the memory access stage active?
   , memActive :: Reg (Bit 1)
     -- If so, the instruction and its result
@@ -126,6 +156,9 @@ data PipelineState xlen instr =
   , memResult :: Reg (Bit xlen)
     -- Is the memory access stage stalling?
   , memStall_w :: Wire (Bit 1)
+
+    -- Writeback
+    -- =========
     -- Is the writeback stage active?
   , wbActive :: Reg (Bit 1)
     -- If so, the instruction and its result.

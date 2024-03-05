@@ -46,10 +46,10 @@ library
     Blarney.Five.Util
     Blarney.Five.Verify
     Blarney.Five.RegMem
-    Blarney.Five.RegFile
     Blarney.Five.Pipeline
     Blarney.Five.Interface
-    Blarney.Five.BranchPred
+    Blarney.Five.RegisterFile
+    Blarney.Five.BranchPredictor
 
 executable blarney-five-gen
   import: blarney-five-common

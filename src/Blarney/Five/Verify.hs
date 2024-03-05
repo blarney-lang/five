@@ -6,11 +6,8 @@ import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
 import Blarney.Five.Util
-import Blarney.Five.RegMem
-import Blarney.Five.RegFile
 import Blarney.Five.Pipeline
 import Blarney.Five.Interface
-import Blarney.Five.BranchPred
 
 -- Type parameters for verification
 type V_XLen    = 3   -- Register width
@@ -86,6 +83,7 @@ v_instrSet execute =
       }
   , execute     = execute
   , incPC       = 1
+  , canBranch   = \i -> i.canBranch
   }
 
 -- Execution unit for verification
@@ -169,22 +167,21 @@ makeCorrectnessVerifier = mdo
   dmem <- makeMapFilterServer (var "dmem_put_mask")
                               (var "dmem_peek_mask")
                               (.hasResp) (.uid)
-  rmem <- if enRegFwd then makeForwardingRegMem numSrcs
-                      else makeRegMem numSrcs
-  bpred <- makeArbitraryPredictor iset s
   exec  <- makeGoldenExecUnit 0 1 True
   let iset = v_instrSet exec
-  rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
-                       else makeBasicRegFile rmem iset s
   let params = 
         PipelineParams {
-          imem           = imem
-        , dmem           = dmem
-        , branchPred     = bpred
-        , regFile        = rf
+          iset             = iset
+        , imem             = imem
+        , dmem             = dmem
+        , branchPredMethod = ArbitraryPredictor
+        , regFileParams    = RegisterFileParams {
+                               useForwarding = enRegFwd
+                             , useRAM        = False
+                             , numReadPorts  = numSrcs
+                             }
         }
-  s <- makePipelineState 0
-  makePipeline iset params s
+  s <- makePipeline params
   checkNoConsecutiveMispreds s
 
 -- Pipeline for forward progress verification
@@ -192,22 +189,22 @@ makeForwardProgressVerifier :: Int -> Int -> Module ()
 makeForwardProgressVerifier n d = mdo
   imem  <- makeMapFilterServer true true (const true) id
   dmem  <- makeMapFilterServer true true (.hasResp) (.uid)
-  bpred <- makeArbitraryPredictor iset s
-  rmem  <- if enRegFwd then makeForwardingRegMem numSrcs
-                       else makeRegMem numSrcs
   exec  <- makeGoldenExecUnit 0 1 False
   let iset = v_instrSet exec
-  rf    <- if enRegFwd then makeForwardingRegFile rmem iset s
-                       else makeBasicRegFile rmem iset s
-  let params =
+  let params = 
         PipelineParams {
-          imem           = imem
-        , dmem           = dmem
-        , branchPred     = bpred
-        , regFile        = rf
+          iset             = iset
+        , imem             = imem
+        , dmem             = dmem
+        , branchPredMethod = ArbitraryPredictor
+        , regFileParams    =
+            RegisterFileParams {
+              useForwarding = enRegFwd
+            , useRAM        = False
+            , numReadPorts  = numSrcs
+            }
         }
-  s <- makePipelineState 0
-  makePipeline iset params s
+  s <- makePipeline params
   checkForwardProgress (fromIntegral n) (fromIntegral d) s
 
 -- Max cycles to retire 1 instruction

@@ -1,9 +1,31 @@
-module Blarney.Five.RegFile where
+module Blarney.Five.RegisterFile where
 
 import Blarney
 import Blarney.Option
 import Blarney.Five.RegMem
 import Blarney.Five.Interface
+
+-- Regsiter file
+-- =============
+
+makeRegisterFile ::
+     (KnownNat xlen, KnownNat lregs)
+  => PipelineParams xlen ilen instr lregs mreq
+  -> PipelineState xlen instr
+  -> Module (RegisterFile xlen instr)
+makeRegisterFile p s = do
+  let nports = p.regFileParams.numReadPorts
+  regMem <-
+    if p.regFileParams.useRAM
+      then if p.regFileParams.useForwarding
+             then makeForwardingRegMemRAM nports
+             else makeRegMemRAM nports
+      else if p.regFileParams.useForwarding
+             then makeForwardingRegMem nports
+             else makeRegMem nports
+  if p.regFileParams.useForwarding
+    then makeForwardingRegFile regMem p.iset s
+    else makeBasicRegFile regMem p.iset s
 
 -- Basic register file
 -- ===================
@@ -37,7 +59,7 @@ makeBasicRegFile regMem iset s = do
     }
 
   where
-    -- Is there a data hazard reading given register?
+    -- Is there a data hazard reading the given source register?
     hazard reg = reg.valid .&&.
          ( s.execActive.val .&&. s.execInstr `writes` reg.val
       .||. s.memActive.val  .&&. s.memInstr  `writes` reg.val
