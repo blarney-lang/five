@@ -70,7 +70,7 @@ data V_Instr =
 v_instrSet execute =
   InstrSet {
     getDest       = \i -> i.rd
-  , getSrcs       = \i -> [i.rs1, i.rs2]
+  , getSrcs       = \i -> (i.rs1, i.rs2)
   , isMemAccess   = \i -> i.isMemAccess
   , decode        = \uid ->
       V_Instr {
@@ -125,7 +125,8 @@ makeGoldenExecUnit initPC instrLen enAsserts = do
     -- Check operands against golden register file
     let operandsOk =
           andList [ r.valid .==>. (goldenRegs!r.val).val .==. o
-                  | (r, o) <- zip [instr.rs1, instr.rs2] s.operands ]
+                  | (r, o) <- zip [instr.rs1, instr.rs2]
+                                  [fst s.operands, snd s.operands] ]
     when enAsserts do
       assert operandsOk "Operands correct"
 

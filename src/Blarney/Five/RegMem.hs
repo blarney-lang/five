@@ -11,10 +11,10 @@ import Blarney.Option
 data RegMem lregs xlen =
   RegMem {
     -- Load each of the given operands
-    load  :: [Bit lregs] -> Action ()
+    load  :: (Bit lregs, Bit lregs) -> Action ()
     -- Values loaded, valid one cycle after call to load and preserved
     -- until load is called against.
-  , outs  :: [Bit xlen]
+  , outs  :: (Bit xlen, Bit xlen)
     -- Overwrite value of given register with given value.
   , store :: Bit lregs -> Bit xlen -> Action ()
   }
@@ -28,24 +28,30 @@ forward :: (KnownNat lregs, KnownNat xlen) =>
   Int -> RegMem lregs xlen -> Module (RegMem lregs xlen)
 forward numReadPorts regMem = do
   -- Register ids being loaded
-  srcRegs  <- replicateM numReadPorts (makeReg dontCare)
-  srcWires <- mapM makeWire (map (.val) srcRegs)
+  srcReg1  <- makeReg dontCare
+  srcReg2  <- makeReg dontCare
+  srcWire1 <- makeWire srcReg1.val
+  srcWire2 <- makeWire srcReg2.val
 
   -- Forwarding registers
   writeReg <- makeReg 0
   writeVal <- makeReg 0
 
   always do
-    regMem.load (map (.val) srcWires)
+    regMem.load (srcWire1.val, srcWire2.val)
+
+  -- Forwarding logic
+  let fwd r m = if writeReg.val .==. r then writeVal.val else m
 
   return
     RegMem {
-      load = \rss -> do
-        zipWithM_ (<==) srcWires rss
-        zipWithM_ (<==) srcRegs rss
-    , outs = 
-        [ if writeReg.val .==. r.val then writeVal.val else x
-        | (r, x) <- zip srcRegs regMem.outs ]
+      load = \(rs1, rs2) -> do
+        srcReg1 <== rs1
+        srcReg2 <== rs2
+        srcWire1 <== rs1
+        srcWire2 <== rs2
+    , outs = let (x1, x2) = regMem.outs in
+               (fwd srcReg1.val x1, fwd srcReg2.val x2)
     , store = \r x -> do
         regMem.store r x
         writeReg <== r
@@ -59,16 +65,16 @@ makeRegMem :: forall lregs xlen. (KnownNat lregs, KnownNat xlen) =>
   Int -> Module (RegMem lregs xlen)
 makeRegMem numReadPorts = do
   -- Register array and operand latches
-  regs    <- replicateM (2 ^ valueOf @lregs) (makeReg 0)
-  latches <- replicateM numReadPorts (makeReg 0)
+  regs   <- replicateM (2 ^ valueOf @lregs) (makeReg 0)
+  latch1 <- makeReg 0
+  latch2 <- makeReg 0
 
   return
     RegMem {
-      load = \rss ->
-        sequence_
-          [ latch <== (regs!r).val
-          | (latch, r) <- zip latches rss ]
-    , outs = map (.val) latches
+      load = \(rs1, rs2) -> do
+        latch1 <== (regs!rs1).val
+        latch2 <== (regs!rs2).val
+    , outs = (latch1.val, latch2.val)
     , store = \r x ->
         (regs!r) <== x
     }
@@ -84,20 +90,21 @@ makeRegMemRAM :: (KnownNat lregs, KnownNat xlen) =>
   Int -> Module (RegMem lregs xlen)
 makeRegMemRAM numReadPorts = do
   -- Register RAM, one per read port
-  rams <- replicateM numReadPorts makeDualRAM
+  ram1 <- makeDualRAM
+  ram2 <- makeDualRAM
 
   -- Read enable wire
   readEnable <- makeWire false
 
   return
     RegMem {
-      load = \rss -> do
-        sequence_
-          [ ram.load r
-          | (ram, r) <- zip rams rss ]
-    , outs = map (.out) rams
-    , store = \r x ->
-        sequence_ [ ram.store r x | ram <- rams ]
+      load = \(rs1, rs2) -> do
+        ram1.load rs1
+        ram2.load rs2
+    , outs = (ram1.out, ram2.out)
+    , store = \r x -> do
+        ram1.store r x
+        ram2.store r x
     }
 
 -- Forwarding version

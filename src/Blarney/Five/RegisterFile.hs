@@ -50,10 +50,10 @@ makeBasicRegFile regMem iset s = do
     RegisterFile {
       submit = \instr -> do
         -- Load operands
-        let rss = iset.getSrcs instr
-        regMem.load (map (.val) rss)
+        let (rs1, rs2) = iset.getSrcs instr
+        regMem.load (rs1.val, rs2.val)
         -- Stall if register file does not hold latest value
-        stall <== orList (map hazard rss)
+        stall <== orList (map hazard [rs1, rs2])
     , operands = regMem.outs
     , stall = stall.val
     }
@@ -93,13 +93,14 @@ makeForwardingRegFile regMem iset s = do
     RegisterFile {
       submit = \instr -> do
         -- Load operands
-        let rss = iset.getSrcs instr
-        regMem.load (map (.val) rss)
+        let (rs1, rs2) = iset.getSrcs instr
+        regMem.load (rs1.val, rs2.val)
         -- Stall if register file does not hold latest value
-        stall <== orList (map hazard rss)
+        stall <== orList (map hazard [rs1, rs2])
     , operands =
-        let rss = iset.getSrcs s.execInstr.val in
-          zipWith forward (map (.val) rss) regMem.outs
+        let (rs1, rs2) = iset.getSrcs s.execInstr.val in
+          (forward rs1.val (fst regMem.outs),
+           forward rs2.val (snd regMem.outs))
     , stall = stall.val
     }
 

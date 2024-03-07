@@ -22,7 +22,7 @@ data InstrSet xlen ilen instr lregs mreq =
     decode :: Bit ilen -> instr
     -- Extract source/destination registers from instruction
   , getDest :: instr -> Option (Bit lregs)
-  , getSrcs :: instr -> [Option (Bit lregs)]
+  , getSrcs :: instr -> (Option (Bit lregs), Option (Bit lregs))
     -- Will instruction issue a data memory request?
   , isMemAccess :: instr -> Bit 1
     -- Function to execute a given instruction
@@ -39,7 +39,7 @@ data ExecState xlen mreq =
     -- Program counter (can be read and written)
     pc :: ReadWrite (Bit xlen)
     -- Instruction operands from the register file (read-only)
-  , operands :: [Bit xlen]
+  , operands :: (Bit xlen, Bit xlen)
     -- Instruction result (write-only)
   , result :: WriteOnly (Bit xlen)
     -- Memory request (write-only)
@@ -93,7 +93,7 @@ data RegisterFile xlen instr =
     submit :: instr -> Action ()
     -- The instruction operands are available one cycle after
     -- submission and will remain stable until submit is called again.
-  , operands :: [Bit xlen]
+  , operands :: (Bit xlen, Bit xlen)
     -- The register file can request a pipeline stall (on the same
     -- cycle as an instruction submission) if the submitted
     -- instruction's operands are not yet available.
