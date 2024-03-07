@@ -120,8 +120,6 @@ data BranchPredictor xlen =
 -- Pipeline state. By convention, we suffix wire field names with "_w".
 data PipelineState xlen instr =
   PipelineState {
-    -- Decode
-    -- ======
     -- Is the decode stage active?
     decActive :: Reg (Bit 1)
     -- If so, the PC of the instruction in the decode stage.
@@ -129,8 +127,6 @@ data PipelineState xlen instr =
     -- Is the decode stage stalling?
   , decStall_w :: Wire (Bit 1)
 
-    -- Execute
-    -- =======
     -- Is the execute stage active?
   , execActive :: Reg (Bit 1)
     -- If so, the instruction to execute with its PC and operands.
@@ -147,8 +143,6 @@ data PipelineState xlen instr =
     -- Branch target of executed instruction
   , execBranch_w :: Wire (Bit xlen)
 
-    -- Memory Access
-    -- =============
     -- Is the memory access stage active?
   , memActive :: Reg (Bit 1)
     -- If so, the instruction and its result
@@ -157,8 +151,6 @@ data PipelineState xlen instr =
     -- Is the memory access stage stalling?
   , memStall_w :: Wire (Bit 1)
 
-    -- Writeback
-    -- =========
     -- Is the writeback stage active?
   , wbActive :: Reg (Bit 1)
     -- If so, the instruction and its result.
