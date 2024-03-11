@@ -5,8 +5,8 @@ import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
 import Blarney.Five.Util
-import Blarney.Five.RegMem
 import Blarney.Five.Interface
+import Blarney.Five.RegisterFile
 import Blarney.Five.BranchPredictor
 
 -- Pipeline state

@@ -58,14 +58,14 @@ data PipelineParams xlen ilen instr lregs mreq =
   , imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
     -- Interface to register file and branch predictor
-  , regFile :: RegMem lregs xlen
+  , regFile :: RegisterFile lregs xlen
   , branchPred :: BranchPredictor xlen instr
   }
 
--- Register memory abstraction, parameterised by the number of
+-- Register file abstraction, parameterised by the number of
 -- registers (2^lregs) and the register size (xlen).
-data RegMem lregs xlen =
-  RegMem {
+data RegisterFile lregs xlen =
+  RegisterFile {
     -- Load each of the given operands
     load  :: (Bit lregs, Bit lregs) -> Action ()
     -- Values loaded, valid one cycle after call to load and preserved

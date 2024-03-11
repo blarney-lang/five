@@ -6,9 +6,9 @@ import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
 import Blarney.Five.Util
-import Blarney.Five.RegMem
 import Blarney.Five.Pipeline
 import Blarney.Five.Interface
+import Blarney.Five.RegisterFile
 import Blarney.Five.BranchPredictor
 
 -- Type parameters for verification
@@ -165,7 +165,7 @@ makeCorrectnessVerifier = mdo
   exec  <- makeGoldenExecUnit 0 1 True
   let iset = v_instrSet exec
   branchPred <- makeArbitraryPredictor iset
-  regFile <- makeRegMem
+  regFile <- makeRegisterFile
   let params = 
         PipelineParams {
           iset             = iset
@@ -185,7 +185,7 @@ makeForwardProgressVerifier n d = mdo
   exec  <- makeGoldenExecUnit 0 1 False
   let iset = v_instrSet exec
   branchPred <- makeArbitraryPredictor iset
-  regFile <- makeRegMem
+  regFile <- makeRegisterFile
   let params =
         PipelineParams {
           iset             = iset

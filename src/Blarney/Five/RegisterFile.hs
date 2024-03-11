@@ -1,6 +1,6 @@
-module Blarney.Five.RegMem
-  ( makeRegMem
-  , makeRegMemRAM
+module Blarney.Five.RegisterFile
+  ( makeRegisterFile
+  , makeRegisterFileRAM
   ) where
 
 import Blarney
@@ -13,7 +13,7 @@ import Blarney.Five.Interface
 -- Given a register memory, return a version that forwards stores to loads
 -- and always reflects the latest values on its output port.
 forward :: (KnownNat lregs, KnownNat xlen) =>
-  RegMem lregs xlen -> Module (RegMem lregs xlen)
+  RegisterFile lregs xlen -> Module (RegisterFile lregs xlen)
 forward regMem = do
    -- Register ids being loaded
    srcReg1  <- makeReg dontCare
@@ -32,7 +32,7 @@ forward regMem = do
    let fwd r m = if writeReg.val .==. r then writeVal.val else m
  
    return
-     RegMem {
+     RegisterFile {
        load = \(rs1, rs2) -> do
          srcReg1 <== rs1
          srcReg2 <== rs2
@@ -49,16 +49,16 @@ forward regMem = do
 -- Register memory using a list of registers
 -- =========================================
 
-makeRegMem :: forall lregs xlen. (KnownNat lregs, KnownNat xlen) =>
-  Module (RegMem lregs xlen)
-makeRegMem = do
+makeRegisterFile :: forall lregs xlen. (KnownNat lregs, KnownNat xlen) =>
+  Module (RegisterFile lregs xlen)
+makeRegisterFile = do
   -- Register array and operand latches
   regs   <- replicateM (2 ^ valueOf @lregs) (makeReg 0)
   latch1 <- makeReg 0
   latch2 <- makeReg 0
 
   forward
-    RegMem {
+    RegisterFile {
       load = \(rs1, rs2) -> do
         latch1 <== (regs!rs1).val
         latch2 <== (regs!rs2).val
@@ -70,9 +70,9 @@ makeRegMem = do
 -- Register memory using onchip synchronous RAMs
 -- =============================================
 
-makeRegMemRAM :: (KnownNat lregs, KnownNat xlen) =>
-  Module (RegMem lregs xlen)
-makeRegMemRAM = do
+makeRegisterFileRAM :: (KnownNat lregs, KnownNat xlen) =>
+  Module (RegisterFile lregs xlen)
+makeRegisterFileRAM = do
   -- Register RAM, one per read port
   ram1 <- makeDualRAM
   ram2 <- makeDualRAM
@@ -81,7 +81,7 @@ makeRegMemRAM = do
   readEnable <- makeWire false
 
   forward
-    RegMem {
+    RegisterFile {
       load = \(rs1, rs2) -> do
         ram1.load rs1
         ram2.load rs2

@@ -45,9 +45,9 @@ library
   other-modules:
     Blarney.Five.Util
     Blarney.Five.Verify
-    Blarney.Five.RegMem
     Blarney.Five.Pipeline
     Blarney.Five.Interface
+    Blarney.Five.RegisterFile
     Blarney.Five.BranchPredictor
 
 executable blarney-five-gen

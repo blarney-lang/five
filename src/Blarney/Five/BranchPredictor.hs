@@ -56,37 +56,33 @@ data BTBEntry xlen =
   deriving (Generic, Bits)
 
 -- Create BTB-based predictor using BTB with 2^n entries
-makeBTBPredictor ::
-     KnownNat xlen
-  => Int
-  -> InstrSet xlen ilen instr lregs mreq
+makeBTBPredictor :: forall n xlen ilen instr lregs mreq.
+     (KnownNat n, KnownNat xlen)
+  => InstrSet xlen ilen instr lregs mreq
   -> Module (BranchPredictor xlen instr)
-makeBTBPredictor n iset =
-  -- Lift table size to type level
-  liftNat n \(_ :: Proxy n) -> do
+makeBTBPredictor iset = do
+  -- Branch target buffer
+  btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
 
-    -- Branch target buffer
-    btb :: RAM (Bit n) (BTBEntry xlen) <- makeDualRAM
+  -- BTB entry being looked up
+  lookup <- makeReg dontCare
 
-    -- BTB entry being looked up
-    lookup <- makeReg dontCare
+  -- Base-2 log of program counter increment
+  let iwidth = log2strict iset.incPC
 
-    -- Base-2 log of program counter increment
-    let iwidth = log2strict iset.incPC
+  -- Function to map PC to BTB index
+  let getIdx :: Bit xlen -> Bit n
+      getIdx = untypedSlice (valueOf @n + iwidth - 1, iwidth)
 
-    -- Function to map PC to BTB index
-    let getIdx :: Bit xlen -> Bit n
-        getIdx = untypedSlice (n + iwidth - 1, iwidth)
-
-    return
-      BranchPredictor {
-        predict = \fetchPC -> do
-          btb.load (getIdx fetchPC)
-          lookup <== fetchPC
-      , val = if btb.out.pc .==. lookup.val .&&. btb.out.taken
-                then btb.out.target
-                else lookup.val + fromIntegral iset.incPC
-      , train = \(instr, pc, target, taken) -> do
-          when (iset.canBranch instr) do
-            btb.store (getIdx pc) (BTBEntry taken pc target)
-      }
+  return
+    BranchPredictor {
+      predict = \fetchPC -> do
+        btb.load (getIdx fetchPC)
+        lookup <== fetchPC
+    , val = if btb.out.pc .==. lookup.val .&&. btb.out.taken
+              then btb.out.target
+              else lookup.val + fromIntegral iset.incPC
+    , train = \(instr, pc, target, taken) -> do
+        when (iset.canBranch instr) do
+          btb.store (getIdx pc) (BTBEntry taken pc target)
+    }
