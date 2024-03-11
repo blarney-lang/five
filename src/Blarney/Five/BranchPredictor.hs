@@ -6,20 +6,6 @@ import Blarney
 import Blarney.Five.Util
 import Blarney.Five.Interface
 
--- Branch predictor
--- ================
-
-makeBranchPredictor ::
-     KnownNat xlen
-  => PipelineParams xlen ilen instr lregs mreq
-  -> PipelineState xlen instr
-  -> Module (BranchPredictor xlen)
-makeBranchPredictor p s =
-  case p.branchPredMethod of
-    NaivePredictor     -> makeNaivePredictor p.iset s
-    ArbitraryPredictor -> makeArbitraryPredictor p.iset s
-    BTBPredictor n     -> makeBTBPredictor n p.iset s
-
 -- Naive branch predictor
 -- ======================
 
@@ -27,15 +13,15 @@ makeBranchPredictor p s =
 makeNaivePredictor ::
      KnownNat xlen
   => InstrSet xlen ilen instr lregs mreq
-  -> PipelineState xlen instr
-  -> Module (BranchPredictor xlen)
-makeNaivePredictor iset s = do
+  -> Module (BranchPredictor xlen instr)
+makeNaivePredictor iset = do
   predPC <- makeReg dontCare
   return
     BranchPredictor {
       predict = \fetchPC -> do
         predPC <== fetchPC + fromIntegral iset.incPC
     , val = predPC.val
+    , train = \branch -> return ()
     }
 
 -- Arbirarty predictor for verification
@@ -45,13 +31,13 @@ makeNaivePredictor iset s = do
 makeArbitraryPredictor ::
      KnownNat xlen
   => InstrSet xlen ilen instr lregs mreq
-  -> PipelineState xlen instr
-  -> Module (BranchPredictor xlen)
-makeArbitraryPredictor iset s = do
+  -> Module (BranchPredictor xlen instr)
+makeArbitraryPredictor iset = do
   return
     BranchPredictor {
       predict = \fetchPC -> return ()
     , val = var "predicted_pc"
+    , train = \branch -> return ()
     }
 
 -- Branch predictor using BTB
@@ -60,8 +46,8 @@ makeArbitraryPredictor iset s = do
 -- Entry in the branch target buffer (BTB)
 data BTBEntry xlen =
   BTBEntry {
-    -- Valid entry?
-    valid :: Bit 1
+    -- Branch taken?
+    taken :: Bit 1
     -- Progam counter
   , pc :: Bit xlen
     -- Branch target for this PC
@@ -74,9 +60,8 @@ makeBTBPredictor ::
      KnownNat xlen
   => Int
   -> InstrSet xlen ilen instr lregs mreq
-  -> PipelineState xlen instr
-  -> Module (BranchPredictor xlen)
-makeBTBPredictor n iset s =
+  -> Module (BranchPredictor xlen instr)
+makeBTBPredictor n iset =
   -- Lift table size to type level
   liftNat n \(_ :: Proxy n) -> do
 
@@ -93,22 +78,15 @@ makeBTBPredictor n iset s =
     let getIdx :: Bit xlen -> Bit n
         getIdx = untypedSlice (n + iwidth - 1, iwidth)
 
-    -- Update BTB
-    always do
-      when (iset.canBranch s.execInstr.val) do
-        btb.store (getIdx s.execPC.val)
-          BTBEntry {
-            valid = s.execBranch_w.active
-          , pc = s.execPC.val
-          , target = s.execBranch_w.val
-          }
-
     return
       BranchPredictor {
         predict = \fetchPC -> do
           btb.load (getIdx fetchPC)
           lookup <== fetchPC
-      , val = if btb.out.valid .&&. btb.out.pc .==. lookup.val
+      , val = if btb.out.pc .==. lookup.val .&&. btb.out.taken
                 then btb.out.target
                 else lookup.val + fromIntegral iset.incPC
+      , train = \(instr, pc, target, taken) -> do
+          when (iset.canBranch instr) do
+            btb.store (getIdx pc) (BTBEntry taken pc target)
       }

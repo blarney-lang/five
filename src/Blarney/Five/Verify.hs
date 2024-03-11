@@ -6,20 +6,14 @@ import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
 import Blarney.Five.Util
+import Blarney.Five.RegMem
 import Blarney.Five.Pipeline
 import Blarney.Five.Interface
+import Blarney.Five.BranchPredictor
 
 -- Type parameters for verification
 type V_XLen    = 3   -- Register width
 type V_LogRegs = 2   -- Log_2 of number of registers
-
--- Number of source operands per instruction
-numSrcs :: Int
-numSrcs = 2
-
--- Enable register forwarding?
-enRegFwd :: Bool
-enRegFwd = True
 
 -- Memory request type for verification
 data V_MemReq =
@@ -170,17 +164,15 @@ makeCorrectnessVerifier = mdo
                               (.hasResp) (.uid)
   exec  <- makeGoldenExecUnit 0 1 True
   let iset = v_instrSet exec
+  branchPred <- makeArbitraryPredictor iset
+  regFile <- makeRegMem
   let params = 
         PipelineParams {
           iset             = iset
         , imem             = imem
         , dmem             = dmem
-        , branchPredMethod = ArbitraryPredictor
-        , regFileParams    = RegisterFileParams {
-                               useForwarding = enRegFwd
-                             , useRAM        = False
-                             , numReadPorts  = numSrcs
-                             }
+        , regFile          = regFile
+        , branchPred       = branchPred
         }
   s <- makePipeline params
   checkNoConsecutiveMispreds s
@@ -192,18 +184,15 @@ makeForwardProgressVerifier n d = mdo
   dmem  <- makeMapFilterServer true true (.hasResp) (.uid)
   exec  <- makeGoldenExecUnit 0 1 False
   let iset = v_instrSet exec
-  let params = 
+  branchPred <- makeArbitraryPredictor iset
+  regFile <- makeRegMem
+  let params =
         PipelineParams {
           iset             = iset
         , imem             = imem
         , dmem             = dmem
-        , branchPredMethod = ArbitraryPredictor
-        , regFileParams    =
-            RegisterFileParams {
-              useForwarding = enRegFwd
-            , useRAM        = False
-            , numReadPorts  = numSrcs
-            }
+        , regFile          = regFile
+        , branchPred       = branchPred
         }
   s <- makePipeline params
   checkForwardProgress (fromIntegral n) (fromIntegral d) s

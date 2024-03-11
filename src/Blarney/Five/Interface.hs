@@ -57,54 +57,26 @@ data PipelineParams xlen ilen instr lregs mreq =
     -- Interfaces to instruction and data memories
   , imem :: Server (Bit xlen) (Bit ilen)
   , dmem :: Server mreq (Bit xlen)
-    -- Register file parameters
-  , regFileParams :: RegisterFileParams
-    -- Branch prediction method
-  , branchPredMethod :: BranchPredictionMethod
+    -- Interface to register file and branch predictor
+  , regFile :: RegMem lregs xlen
+  , branchPred :: BranchPredictor xlen instr
   }
 
--- Register file parameters
-data RegisterFileParams =
-  RegisterFileParams {
-    -- Enable register forwarding?
-    useForwarding :: Bool
-    -- Use onchip RAM rather than FFs?
-  , useRAM :: Bool
-    -- Number of read ports
-  , numReadPorts :: Int
+-- Register memory abstraction, parameterised by the number of
+-- registers (2^lregs) and the register size (xlen).
+data RegMem lregs xlen =
+  RegMem {
+    -- Load each of the given operands
+    load  :: (Bit lregs, Bit lregs) -> Action ()
+    -- Values loaded, valid one cycle after call to load and preserved
+    -- until load is called against.
+  , outs  :: (Bit xlen, Bit xlen)
+    -- Overwrite value of given register with given value.
+  , store :: Bit lregs -> Bit xlen -> Action ()
   }
 
--- Branch prediction method
-data BranchPredictionMethod =
-    -- Arbitrary predictor for verification
-    ArbitraryPredictor
-    -- Always predict branch-not-taken
-  | NaivePredictor
-    -- Prediction using a branch target buffer with 2^n entries
-  | BTBPredictor Int
-
--- Register file
--- =============
-
--- Interface to the register file
-data RegisterFile xlen instr =
-  RegisterFile {
-    -- Submit instruction to the register file.
-    submit :: instr -> Action ()
-    -- The instruction operands are available one cycle after
-    -- submission and will remain stable until submit is called again.
-  , operands :: (Bit xlen, Bit xlen)
-    -- The register file can request a pipeline stall (on the same
-    -- cycle as an instruction submission) if the submitted
-    -- instruction's operands are not yet available.
-  , stall :: Bit 1
-  }
-
--- Branch predictor
--- ================
-
--- Interface to the branch predictor
-data BranchPredictor xlen =
+-- Branch predictor interface
+data BranchPredictor xlen instr =
   BranchPredictor {
     -- Given the PC of the instruction currently being fetched,
     -- predict the PC of the next instruction to fetch.
@@ -112,6 +84,10 @@ data BranchPredictor xlen =
     -- The prediction is available one cycle after calling predict and
     -- will remain stable until predict is called again.
   , val :: Bit xlen
+    -- Inform the predictor about a branch, including the instruction
+    -- that caused the branch, its address, the branch target address,
+    -- and whether or not the branch was taken
+  , train :: (instr, Bit xlen, Bit xlen, Bit 1) -> Action ()
   }
 
 -- Pipeline state
