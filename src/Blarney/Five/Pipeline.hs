@@ -113,7 +113,7 @@ execute p s = do
     p.iset.execute s.execInstr.val
       ExecState {
         pc       = ReadWrite s.execPC.val (s.execBranch_w <==)
-      , operands = forwarded p s
+      , operands = getOperands p s
       , result   = WriteOnly (s.execResult_w <==)
       , memReq   = WriteOnly p.dmem.reqs.put
       }
@@ -176,7 +176,7 @@ hazard p s src = src.valid .&&.
 -- ===================
 
 -- Get latest register values using forwarding
-forwarded p s = (forward rs1 x1, forward rs2 x2)
+getOperands p s = (forward rs1 x1, forward rs2 x2)
   where  
     (rs1, rs2) = p.iset.getSrcs s.execInstr.val
     (x1, x2) = p.regFile.outs
