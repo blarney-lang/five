@@ -84,10 +84,10 @@ data BranchPredictor xlen instr =
     -- The prediction is available one cycle after calling predict and
     -- will remain stable until predict is called again.
   , val :: Bit xlen
-    -- Inform the predictor about a branch, including the instruction
-    -- that caused the branch, its address, the branch target address,
-    -- and whether or not the branch was taken
-  , train :: (instr, Bit xlen, Bit xlen, Bit 1) -> Action ()
+    -- Inform the predictor about control-flow behaviour, including an
+    -- instruction, its address, and the branch target address (if
+    -- indeed a branch was taken)
+  , train :: instr -> Bit xlen -> Option (Bit xlen) -> Action ()
   }
 
 -- Pipeline state

@@ -119,8 +119,8 @@ execute p s = do
       }
     s.execExpectedPC <== if s.execBranch_w.active then s.execBranch_w.val
       else s.execPC.val + fromIntegral p.iset.incPC
-    p.branchPred.train (s.execInstr.val, s.execPC.val,
-                      s.execBranch_w.val, s.execBranch_w.active)
+    p.branchPred.train s.execInstr.val s.execPC.val
+                       (Option s.execBranch_w.active s.execBranch_w.val)
   -- Setup memory access stage
   when (inv s.memStall_w.val) do
     s.memActive <== fire

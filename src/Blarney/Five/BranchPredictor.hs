@@ -3,6 +3,7 @@ module Blarney.Five.BranchPredictor where
 import Data.Proxy
 
 import Blarney
+import Blarney.Option
 import Blarney.Five.Util
 import Blarney.Five.Interface
 
@@ -21,7 +22,7 @@ makeNaivePredictor iset = do
       predict = \fetchPC -> do
         predPC <== fetchPC + fromIntegral iset.incPC
     , val = predPC.val
-    , train = \branch -> return ()
+    , train = \_ _ _ -> return ()
     }
 
 -- Arbirarty predictor for verification
@@ -37,7 +38,7 @@ makeArbitraryPredictor iset = do
     BranchPredictor {
       predict = \fetchPC -> return ()
     , val = var "predicted_pc"
-    , train = \branch -> return ()
+    , train = \_ _ _ -> return ()
     }
 
 -- Branch predictor using BTB
@@ -82,7 +83,7 @@ makeBTBPredictor iset = do
     , val = if btb.out.pc .==. lookup.val .&&. btb.out.taken
               then btb.out.target
               else lookup.val + fromIntegral iset.incPC
-    , train = \(instr, pc, target, taken) -> do
+    , train = \instr pc target -> do
         when (iset.canBranch instr) do
-          btb.store (getIdx pc) (BTBEntry taken pc target)
+          btb.store (getIdx pc) (BTBEntry target.valid pc target.val)
     }
