@@ -113,7 +113,9 @@ execute p s = do
     p.iset.execute s.execInstr.val
       ExecState {
         pc       = ReadWrite s.execPC.val (s.execBranch_w <==)
-      , operands = getOperands p s
+      , operands = let (x1, x2) = p.regFile.outs
+                       (r1, r2) = p.iset.getSrcs s.execInstr.val
+                   in  (forward p s r1 x1, forward p s r2 x2)
       , result   = WriteOnly (s.execResult_w <==)
       , memReq   = WriteOnly p.dmem.reqs.put
       }
@@ -137,11 +139,13 @@ memAccess p s = do
   let isMemAccess = p.iset.isMemAccess s.memInstr.val
   let waitResp = if isMemAccess then rd.valid else false
   -- Issue stall to earlier stages
+  let canFire = inv waitResp .||. p.dmem.resps.canPeek
+  s.memStall_w <== s.memActive.val .&&. inv canFire
   let stall = if s.memActive.val .&&. waitResp
         then inv p.dmem.resps.canPeek else false
   s.memStall_w <== stall
   -- Setup writeback stage and consume dmem response
-  s.wbActive <== s.memActive.val .&&. inv stall
+  s.wbActive <== s.memActive.val .&&. canFire
   s.wbInstr <== s.memInstr.val
   if waitResp
     then when p.dmem.resps.canPeek do
@@ -164,31 +168,26 @@ writeback p s = do
 
 -- Is there a data hazard when reading from the given source register?
 hazard p s src = src.valid .&&.
-     ( s.execActive.val .&&. s.execInstr `loads` src.val
-  .||. s.memStall_w.val .&&. s.memInstr  `loads` src.val )
+     ( s.execActive.val .&&. s.execInstr `loads` src
+  .||. s.memStall_w.val .&&. s.memInstr  `loads` src )
   where
     -- Does given instruction load from memory into given reg?
     instr `loads` reg = p.iset.isMemAccess instr.val .&&.
-                          rd.valid .&&. rd.val .==. reg
+                          rd.valid .&&. rd.val .==. reg.val
       where rd = p.iset.getDest instr.val
 
 -- Register forwarding
 -- ===================
 
--- Get latest register values using forwarding
-getOperands p s = (forward rs1 x1, forward rs2 x2)
-  where  
-    (rs1, rs2) = p.iset.getSrcs s.execInstr.val
-    (x1, x2) = p.regFile.outs
-
-    forward src old =
-      if s.memActive.val .&&. s.memInstr `writes` src.val
-         then s.memResult.val
-         else if s.wbActive.val .&&. s.wbInstr `writes` src.val
-                then s.wbResult.val else old
-
+-- Override value old from the register file if there is a more recent value
+forward p s src old =
+  if s.memActive.val .&&. s.memInstr `writes` src
+    then s.memResult.val
+    else if s.wbActive.val .&&. s.wbInstr `writes` src
+           then s.wbResult.val else old
+  where
     -- Does given instruction write to given reg?
-    instr `writes` reg = rd.valid .&&. rd.val .==. reg
+    instr `writes` reg = rd.valid .&&. rd.val .==. reg.val
       where rd = p.iset.getDest instr.val
 
 -- Five-stage pipeline
