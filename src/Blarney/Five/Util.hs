@@ -2,10 +2,6 @@ module Blarney.Five.Util where
 
 import Blarney
 
--- Obtain universally quantified variable for verification
-var :: KnownNat n => String -> Bit n
-var = inputPin
-
 -- Base-2 logarithm with error
 log2strict :: Int -> Int
 log2strict x
