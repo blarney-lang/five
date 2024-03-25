@@ -28,8 +28,8 @@ data Instr = Instr {
   }
   deriving (Generic, Bits)
 
--- Data memory requests have an address and may expect a response
-data MReq = MReq { addr :: Bit XLen, hasResp :: Bit 1 }
+-- Data memory requests have a value and may expect a response
+data MReq = MReq { val :: Bit XLen, hasResp :: Bit 1 }
   deriving (Generic, Bits)
 
 -- An "instruction set" that checks pipeline properties
@@ -64,14 +64,14 @@ makeChecker enAsserts = do
         when enAsserts do
           assert (s.pc.val .==. goldenPC.val) "PC correct"
         -- Issue memory request
-        let mreq = MReq { addr = var "addr", hasResp = i.rd.valid }
+        let mreq = MReq { val = var "mreq_val", hasResp = i.rd.valid }
         when i.isMemAccess do s.memReq <== mreq
         -- Write result and update golden register file
         when i.rd.valid do
           let result = var "result"
           s.result <== result
           goldenRegs!i.rd.val <==
-            if i.isMemAccess then mreq.addr else result
+            if i.isMemAccess then mreq.val else result
         -- Check operands against golden register file
         let check r x = r.valid .==>. (goldenRegs!r.val).val .==. x
         when enAsserts do
@@ -142,7 +142,7 @@ makeCorrectnessVerifier = mdo
                               (const true) id
   dmem <- makeMapFilterServer (var "dmem_put_mask")
                               (var "dmem_peek_mask")
-                              (.hasResp) (.addr)
+                              (.hasResp) (.val)
   iset <- makeChecker True
   branchPred <- makeArbitraryPredictor iset
   regFile <- makeRegisterFile
@@ -161,7 +161,7 @@ makeCorrectnessVerifier = mdo
 makeForwardProgressVerifier :: Int -> Int -> Module ()
 makeForwardProgressVerifier n d = mdo
   imem <- makeMapFilterServer true true (const true) id
-  dmem <- makeMapFilterServer true true (.hasResp) (.addr)
+  dmem <- makeMapFilterServer true true (.hasResp) (.val)
   iset <- makeChecker False
   branchPred <- makeArbitraryPredictor iset
   regFile <- makeRegisterFile
