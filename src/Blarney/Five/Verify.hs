@@ -160,8 +160,11 @@ makeCorrectnessVerifier = mdo
 -- Pipeline for forward progress verification
 makeForwardProgressVerifier :: Int -> Int -> Module ()
 makeForwardProgressVerifier n d = mdo
-  imem <- makeMapFilterServer true true (const true) id
-  dmem <- makeMapFilterServer true true (.hasResp) (.val)
+  let maxExtraLatency = 1 :: Bit 2
+  imask <- makeLowForAtMost maxExtraLatency "imem_peek_mask"
+  dmask <- makeLowForAtMost maxExtraLatency "dmem_peek_mask"
+  imem <- makeMapFilterServer true imask (const true) id
+  dmem <- makeMapFilterServer true dmask (.hasResp) (.val)
   iset <- makeChecker False
   branchPred <- makeArbitraryPredictor iset
   regFile <- makeRegisterFile
@@ -178,11 +181,11 @@ makeForwardProgressVerifier n d = mdo
 
 -- Max cycles to retire 1 instruction
 -- (For forward progress checking)
-maxCyclesToRetire1 = 8
+maxCyclesToRetire1 = 12
 
 -- Max cycles to retire 2 instructions
 -- (For forward progress checking)
-maxCyclesToRetire2 = 13
+maxCyclesToRetire2 = 21
 
 -- Generate SMT scripts for verification
 genSMTScripts :: IO ()
