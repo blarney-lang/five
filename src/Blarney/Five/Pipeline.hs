@@ -26,7 +26,6 @@ makePipelineState = do
   execMispredict <- makeSetResetBypass
   execExpectedPC <- makeReg initPC
   execStall_w    <- makeWire false
-  execResult_w   <- makeWire dontCare
   execBranch_w   <- makeWire dontCare
   memActive      <- makeReg false
   memInstr       <- makeReg dontCare
@@ -116,7 +115,7 @@ execute p s = do
       , operands = let (x1, x2) = p.regFile.outs
                        (r1, r2) = p.iset.getSrcs s.execInstr.val
                    in  (forward p s r1 x1, forward p s r2 x2)
-      , result   = WriteOnly (s.execResult_w <==)
+      , result   = WriteOnly (s.memResult <==)
       , memReq   = WriteOnly p.dmem.reqs.put
       }
     s.execExpectedPC <== if s.execBranch_w.active then s.execBranch_w.val
@@ -127,7 +126,6 @@ execute p s = do
   when (inv s.memStall_w.val) do
     s.memActive <== fire
     s.memInstr <== s.execInstr.val
-    s.memResult <== s.execResult_w.val
 
 -- Stage 4: memory access
 -- ======================
@@ -141,9 +139,6 @@ memAccess p s = do
   -- Issue stall to earlier stages
   let canFire = inv waitResp .||. p.dmem.resps.canPeek
   s.memStall_w <== s.memActive.val .&&. inv canFire
-  let stall = if s.memActive.val .&&. waitResp
-        then inv p.dmem.resps.canPeek else false
-  s.memStall_w <== stall
   -- Setup writeback stage and consume dmem response
   s.wbActive <== s.memActive.val .&&. canFire
   s.wbInstr <== s.memInstr.val

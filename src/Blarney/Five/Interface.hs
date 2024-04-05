@@ -114,8 +114,6 @@ data PipelineState xlen instr =
   , execMispredict :: SetReset
     -- Is the execute stage stalling?
   , execStall_w :: Wire (Bit 1)
-    -- Instruction result
-  , execResult_w :: Wire (Bit xlen)
     -- Branch target of executed instruction
   , execBranch_w :: Wire (Bit xlen)
 
