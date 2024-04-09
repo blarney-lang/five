@@ -13,8 +13,8 @@ import Blarney.Five.BranchPredictor
 -- ==============
 
 -- Create pipeline state
-makePipelineState :: (KnownNat xlen, Bits instr) =>
-  Module (PipelineState xlen instr)
+makePipelineState :: (KnownNat xlen, Bits instr, Bits mreq) =>
+  Module (PipelineState xlen instr mreq)
 makePipelineState = do
   let initPC = 0
   decActive      <- makeReg false
@@ -29,11 +29,13 @@ makePipelineState = do
   execBranch_w   <- makeWire dontCare
   memActive      <- makeReg false
   memInstr       <- makeReg dontCare
+  memReq         <- makeReg dontCare
   memResult      <- makeReg dontCare
   memStall_w     <- makeWire false
   wbActive       <- makeReg false
   wbInstr        <- makeReg dontCare
   wbResult       <- makeReg dontCare
+  wbStall_w      <- makeWire false
   return (PipelineState {..})
 
 -- Pipeline stage
@@ -42,7 +44,7 @@ makePipelineState = do
 type PipelineStage xlen ilen instr lregs mreq =
      (KnownNat xlen, KnownNat lregs, Bits instr, Bits mreq)
   => PipelineParams xlen ilen instr lregs mreq
-  -> PipelineState xlen instr
+  -> PipelineState xlen instr mreq
   -> Action ()
 
 -- Stage 1: instruction fetch
@@ -96,18 +98,13 @@ decode p s = do
 
 execute :: PipelineStage xlen ilen instr lregs mreq
 execute p s = do
-  -- Is memory ready for a new request?
-  let isMemAccess = p.iset.isMemAccess s.execInstr.val
-  let waitForMem = isMemAccess .&&. inv p.dmem.reqs.canPut
-  -- Can execute stage fire?
-  let canFire = inv s.memStall_w.val .&&. inv waitForMem
   -- Issue stall to earlier stages
-  s.execStall_w <== s.execActive.val .&&. inv canFire
+  s.execStall_w <== s.execActive.val .&&. s.memStall_w.val
   -- Look for misprediction
   let mispredict = s.execPC.val .!=. s.execExpectedPC.val
   when (s.execActive.val .&&. mispredict) do s.execMispredict.set
   -- Issue instruction to execution unit
-  let fire = s.execActive.val .&&. canFire .&&. inv mispredict
+  let fire = s.execActive.val .&&. inv s.memStall_w.val .&&. inv mispredict
   when fire do
     p.iset.execute s.execInstr.val
       ExecState {
@@ -116,7 +113,7 @@ execute p s = do
                        (r1, r2) = p.iset.getSrcs s.execInstr.val
                    in  (forward p s r1 x1, forward p s r2 x2)
       , result   = WriteOnly (s.memResult <==)
-      , memReq   = WriteOnly p.dmem.reqs.put
+      , memReq   = WriteOnly (s.memReq <==)
       }
     s.execExpectedPC <== if s.execBranch_w.active then s.execBranch_w.val
       else s.execPC.val + fromIntegral p.iset.incPC
@@ -132,31 +129,36 @@ execute p s = do
 
 memAccess :: PipelineStage xlen ilen instr lregs mreq
 memAccess p s = do
-  -- Do we need to wait for a memory response?
-  let rd = p.iset.getDest s.memInstr.val
+  -- Is memory ready for a new request?
   let isMemAccess = p.iset.isMemAccess s.memInstr.val
-  let waitResp = if isMemAccess then rd.valid else false
+  let waitForMem = isMemAccess .&&. inv p.dmem.reqs.canPut
   -- Issue stall to earlier stages
-  let canFire = inv waitResp .||. p.dmem.resps.canPeek
-  s.memStall_w <== s.memActive.val .&&. inv canFire
-  -- Setup writeback stage and consume dmem response
-  s.wbActive <== s.memActive.val .&&. canFire
-  s.wbInstr <== s.memInstr.val
-  if waitResp
-    then when p.dmem.resps.canPeek do
-           p.dmem.resps.consume
-           s.wbResult <== p.dmem.resps.peek
-    else s.wbResult <== s.memResult.val
+  s.memStall_w <== s.memActive.val .&&. (waitForMem .||. s.wbStall_w.val)
+  -- Setup writeback stage
+  when (inv s.wbStall_w.val) do
+    s.wbActive <== s.memActive.val .&&. inv waitForMem
+    s.wbInstr <== s.memInstr.val
+    s.wbResult <== s.memResult.val
+    -- Issue memory request
+    when (s.memActive.val .&&. isMemAccess .&&. p.dmem.reqs.canPut) do
+      p.dmem.reqs.put s.memReq.val
 
 -- Stage 5: writeback
 -- ==================
 
 writeback :: PipelineStage xlen ilen instr lregs mreq
 writeback p s = do
-  when s.wbActive.val do
-    let rd = p.iset.getDest s.wbInstr.val
-    when rd.valid do
-      p.regFile.store rd.val s.wbResult.val
+  let rd = p.iset.getDest s.wbInstr.val
+  let isMemAccess = p.iset.isMemAccess s.wbInstr.val
+  -- Wait for memory response?
+  let waitResp = isMemAccess .&&. rd.valid .&&. inv p.dmem.resps.canPeek
+  -- Issue stall to earlier stages
+  s.wbStall_w <== s.wbActive.val .&&. waitResp
+  -- Update register file
+  when (s.wbActive.val .&&. rd.valid .&&. inv waitResp) do
+    when isMemAccess do p.dmem.resps.consume
+    let result = if isMemAccess then p.dmem.resps.peek else s.wbResult.val
+    p.regFile.store rd.val result
 
 -- Data hazard detection
 -- =====================
@@ -164,7 +166,8 @@ writeback p s = do
 -- Is there a data hazard when reading from the given source register?
 hazard p s src = src.valid .&&.
      ( s.execActive.val .&&. s.execInstr `loads` src
-  .||. s.memStall_w.val .&&. s.memInstr  `loads` src )
+  .||. s.memActive.val .&&. s.memInstr `loads` src
+  .||. s.wbStall_w.val .&&. s.wbInstr `loads` src )
   where
     -- Does given instruction load from memory into given reg?
     instr `loads` reg = p.iset.isMemAccess instr.val .&&.
@@ -191,7 +194,7 @@ forward p s src old =
 makePipeline ::
      (KnownNat xlen, KnownNat lregs, Bits instr, Bits mreq)
   => PipelineParams xlen ilen instr lregs mreq
-  -> Module (PipelineState xlen instr)
+  -> Module (PipelineState xlen instr mreq)
 makePipeline p = do
   -- Pipeline state
   s <- makePipelineState
