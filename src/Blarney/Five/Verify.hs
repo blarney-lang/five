@@ -1,5 +1,7 @@
 module Blarney.Five.Verify (genSMTScripts, verify) where
 
+import Data.Proxy
+
 import Blarney
 import Blarney.Queue
 import Blarney.Option
@@ -95,21 +97,18 @@ checkNoConsecutiveMispreds s = do
     assert (mispreds.val .<=. 1)
            "No consecutive branch mispredictions"
 
--- Check that at least n instructions can be retired within given
--- time bound t.
-checkForwardProgress n t s = do
-  -- How many instructions have been committed?
-  retired :: Reg (Bit 8) <- makeReg 0
+-- Check that at an instruction is retired every n cycles at least
+checkForwardProgress n s = do
+  liftNat (log2ceil n + 1) $ \(_ :: Proxy w) -> do
 
-  -- Time
-  time :: Reg (Bit 8) <- makeReg 0
+    -- Cycles since last retired instruction
+    count :: Reg (Bit w) <- makeReg 0
 
-  always do
-    time <== time.val + 1
-    when s.wbActive.val do
-      retired <== retired.val + 1
-    assert (time.val .>=. t .==>. retired.val .>=. fromInteger n)
-           ("Forward progress " ++ show n)
+    always do
+      if s.wbActive.val
+        then count <== 0
+        else count <== count.val + 1
+      assert (count.val .<=. fromIntegral n) "Forward progress"
 
 -- The map-filter server consumes requests, filters out requests that
 -- don't match a given predicate, applies a given function to convert a
@@ -158,8 +157,8 @@ makeCorrectnessVerifier = mdo
   checkNoConsecutiveMispreds s
 
 -- Pipeline for forward progress verification
-makeForwardProgressVerifier :: Int -> Int -> Module ()
-makeForwardProgressVerifier n d = mdo
+makeForwardProgressVerifier :: Int -> Module ()
+makeForwardProgressVerifier n = mdo
   let maxExtraLatency = 1 :: Bit 2
   imask <- makeLowForAtMost maxExtraLatency "imem_peek_mask"
   dmask <- makeLowForAtMost maxExtraLatency "dmem_peek_mask"
@@ -177,15 +176,11 @@ makeForwardProgressVerifier n d = mdo
         , branchPred       = branchPred
         }
   s <- makePipeline params
-  checkForwardProgress (fromIntegral n) (fromIntegral d) s
+  checkForwardProgress n s
 
--- Max cycles to retire 1 instruction
+-- Max cycles to retire an instruction
 -- (For forward progress checking)
-maxCyclesToRetire1 = 12
-
--- Max cycles to retire 2 instructions
--- (For forward progress checking)
-maxCyclesToRetire2 = 21
+maxCyclesToRetire = 10
 
 -- Generate SMT scripts for verification
 genSMTScripts :: IO ()
@@ -196,15 +191,10 @@ genSMTScripts = do
              }
   writeSMTScript conf makeCorrectnessVerifier "Correctness" "SMT"
 
-  let cycs = maxCyclesToRetire1
-  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth (cycs+1)) }
-  writeSMTScript conf (makeForwardProgressVerifier 1 cycs)
-                 "ForwardProgress1" "SMT"
-
-  let cycs = maxCyclesToRetire2
-  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth (cycs+1)) }
-  writeSMTScript conf (makeForwardProgressVerifier 2 cycs)
-                 "ForwardProgress2" "SMT"
+  let d = 2 * maxCyclesToRetire + 2
+  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
+  writeSMTScript conf (makeForwardProgressVerifier maxCyclesToRetire)
+                 "ForwardProgress" "SMT"
 
 -- Lauch SMT solver and verify. This is the recommended flow (it's more
 -- efficient) but not the default as it assumes an SMT solver is available.
@@ -216,10 +206,6 @@ verify = do
              }
   verifyWith conf makeCorrectnessVerifier
 
-  let cycs = maxCyclesToRetire1
-  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth (cycs+1)) }
-  verifyWith conf (makeForwardProgressVerifier 1 cycs)
-
-  let cycs = maxCyclesToRetire2
-  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth (cycs+1)) }
-  verifyWith conf (makeForwardProgressVerifier 2 cycs)
+  let d = 2 * maxCyclesToRetire + 2
+  let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
+  verifyWith conf (makeForwardProgressVerifier maxCyclesToRetire)
