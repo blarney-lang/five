@@ -30,7 +30,9 @@ make shell
 
 ## Usage
 
-To generate SMT formulae capturing the correctness of the pipeline:
+The pipeline can be verified using both bounded and unbounded model checking on top of the z3 solver.
+
+For bounded checking, SMT formulae can be generated as follows.
 
 ```sh
 cabal run blarney-five-gen
@@ -47,8 +49,16 @@ verifies the properties directly and incrementally.
 cabal run blarney-five-verify
 ```
 
+For unbounded checking, which requires around ten hours to complete, use the
+command:
+
+```sh
+cabal run blarney-five-verify-unbounded
+```
+
 ## Acknowledgements
 
+Thanks to Alexandre Joannou and Victor Miquel for there contributions to Blarneyy's SMT backend, which allowed verification of all pipeline properties.
 Five was developed on the [CAPcelerate
 project](https://gow.epsrc.ukri.org/NGBOViewGrant.aspx?GrantRef=EP/V000381/1),
 part of the UKRI's Digital Security by Design programme.

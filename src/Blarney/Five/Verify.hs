@@ -1,4 +1,4 @@
-module Blarney.Five.Verify (genSMTScripts, verify) where
+module Blarney.Five.Verify (genSMTScripts, verify, verifyUnbounded) where
 
 import Data.Proxy
 
@@ -7,6 +7,7 @@ import Blarney.Queue
 import Blarney.Option
 import Blarney.SourceSink
 import Blarney.ClientServer
+import Blarney.Backend.NewSMT
 import Blarney.Five.Util
 import Blarney.Five.Pipeline
 import Blarney.Five.Interface
@@ -209,3 +210,9 @@ verify = do
   let d = 2 * maxCyclesToRetire + 2
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
   verifyWith conf (makeForwardProgressVerifier maxCyclesToRetire)
+
+-- Lauch SMT solver and verify unbounded using Blarney's new SMT backend.
+verifyUnbounded :: IO ()
+verifyUnbounded = do
+  checkAuto Verbose makeCorrectnessVerifier
+  checkAuto Verbose (makeForwardProgressVerifier maxCyclesToRetire)
