@@ -58,7 +58,7 @@ cabal run blarney-five-verify-unbounded
 
 ## Acknowledgements
 
-Thanks to Alexandre Joannou and Victor Miquel for there contributions to Blarneyy's SMT backend, which allowed verification of all pipeline properties.
+Thanks to Alexandre Joannou and Victor Miquel for their contributions to Blarneyy's SMT backend, which allowed verification of all pipeline properties.
 Five was developed on the [CAPcelerate
 project](https://gow.epsrc.ukri.org/NGBOViewGrant.aspx?GrantRef=EP/V000381/1),
 part of the UKRI's Digital Security by Design programme.
