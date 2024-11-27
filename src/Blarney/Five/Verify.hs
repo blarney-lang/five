@@ -113,7 +113,7 @@ makeMapFilterServer putMask peekMask p f = do
                      when (p req) do q.enq (f req) }
   return (Server snk src)
 
--- Pipeline for forward progress verification
+-- Pipeline instantiation for verification
 makeVerifier :: Module ()
 makeVerifier = mdo
   let maxExtraLatency = 1 :: Bit 2
