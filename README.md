@@ -31,9 +31,9 @@ make shell
 
 ## Usage
 
-The pipeline can be verified using both bounded and unbounded model checking, either via SymbiYosys or the z3 SMT solver.
+The pipeline can be verified either via SymbiYosys or the z3 SMT solver.
 
-Verilog and SMT for verification can be generated as follows.
+Verilog and SMT files for verification can be generated as follows.
 
 ```sh
 make gen
