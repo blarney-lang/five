@@ -6,6 +6,10 @@ gen:
 verify:
 	cabal run blarney-five-verify
 
+.PHONY: verify-unbounded
+verify-unbounded:
+	cabal run blarney-five-verify-unbounded
+
 # Docker variables
 USER=$(if $(shell id -u),$(shell id -u),9001)
 GROUP=$(if $(shell id -g),$(shell id -g),1000)
@@ -23,4 +27,4 @@ shell: build-docker
 .PHONY: clean
 clean:
 	cabal clean
-	rm -rf gen/*.v gen/*.smt gen/check/ gen/check_*
+	rm -rf gen/*.v gen/*.smt2 gen/check/ gen/check_*

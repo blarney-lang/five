@@ -2,7 +2,7 @@
 Correctness
 
 [options]
-depth 10
+depth 25
 mode bmc
 
 [engines]

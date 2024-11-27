@@ -31,24 +31,22 @@ make shell
 
 ## Usage
 
-The pipeline can be verified using both bounded and unbounded model checking, either using the z3 SMT solver or SymbiYosys.
+The pipeline can be verified using both bounded and unbounded model checking, either via SymbiYosys or the z3 SMT solver.
 
-For bounded checking, Verilog and SMT can be generated as follows.
+For bounded checking via SymbiYosys, Verilog can be generated as follows.
 
 ```sh
 cabal run blarney-five-gen
 ```
 
-The outputs are written to the `gen/` directory and can be checked as follows
+The Verilog is written to the `gen/` directory and can be checked as follows.
 
 ```sh
 cd gen
-z3 Correctness.smt      # Verify the SMT using z3
-sby check.sby -f        # Verify the Verilog using SymbiYosys
+sby check.sby -f        # Verify the generated Verilog using SymbiYosys
 ```
 
-If z3 is in your `PATH` then the following command can be used to verify the
-SMT formulae directly and incrementally.
+If z3 is in your `PATH` then the following command can be used.
 
 ```sh
 cabal run blarney-five-verify

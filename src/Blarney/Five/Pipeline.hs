@@ -1,4 +1,4 @@
-module Blarney.Five.Pipeline where
+module Blarney.Five.Pipeline (makePipeline) where
   
 import Blarney
 import Blarney.Option
@@ -11,6 +11,48 @@ import Blarney.Five.BranchPredictor
 
 -- Pipeline state
 -- ==============
+
+-- By convention, we suffix wire field names with "_w".
+data PipelineState xlen instr mreq =
+  PipelineState {
+    -- Is the decode stage active?
+    decActive :: Reg (Bit 1)
+    -- If so, the PC of the instruction in the decode stage.
+  , decPC :: Reg (Bit xlen)
+    -- Is the decode stage stalling?
+  , decStall_w :: Wire (Bit 1)
+
+    -- Is the execute stage active?
+  , execActive :: Reg (Bit 1)
+    -- If so, the instruction to execute with its PC and operands.
+  , execInstr :: Reg instr
+  , execPC :: Reg (Bit xlen)
+    -- The PC of the next instruction expected in the execute stage.
+  , execExpectedPC :: Reg (Bit xlen)
+    -- Is the instruction in the execute stage mispredicted?
+  , execMispredict :: SetReset
+    -- Is the execute stage stalling?
+  , execStall_w :: Wire (Bit 1)
+    -- Branch target of executed instruction
+  , execBranch_w :: Wire (Bit xlen)
+
+    -- Is the memory access stage active?
+  , memActive :: Reg (Bit 1)
+    -- If so, the memory request, the instruction, and its result
+  , memReq :: Reg mreq
+  , memInstr :: Reg instr
+  , memResult :: Reg (Bit xlen)
+    -- Is the memory access stage stalling?
+  , memStall_w :: Wire (Bit 1)
+
+    -- Is the writeback stage active?
+  , wbActive :: Reg (Bit 1)
+    -- If so, the instruction and its result.
+  , wbInstr :: Reg instr
+  , wbResult :: Reg (Bit xlen)
+    -- Is the writeback stage stalling?
+  , wbStall_w :: Wire (Bit 1)
+  }
 
 -- Create pipeline state
 makePipelineState :: (KnownNat xlen, Bits instr, Bits mreq) =>
@@ -194,7 +236,7 @@ forward p s src old =
 makePipeline ::
      (KnownNat xlen, KnownNat lregs, Bits instr, Bits mreq)
   => PipelineParams xlen ilen instr lregs mreq
-  -> Module (PipelineState xlen instr mreq)
+  -> Module ()
 makePipeline p = do
   -- Pipeline state
   s <- makePipelineState
@@ -206,4 +248,3 @@ makePipeline p = do
     execute p s
     memAccess p s
     writeback p s
-  return s
