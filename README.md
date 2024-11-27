@@ -17,10 +17,11 @@ First, download the repo:
 git clone --recursive https://github.com/blarney-lang/five
 ```
 
-We'll need the z3 solver (version 4.12.2 known working), GHC (version 9.4.5 known working), and SymbiYosys OSS CAD Suite (version 2024-11-27 known working). Version 4.12.2 of z3 can be found in this [zip
-file](https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-glibc-2.31.zip).
-For GHC 9.4.5, [ghcup](https://www.haskell.org/ghcup/) can be used.
-Version 2024-11-27 of SymbiYosys OSS CAD suite can be found in this [tar file](https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2024-11-27/oss-cad-suite-linux-x64-20241127.tgz).
+We then have the following dependencies:
+
+  * GHC (version 9.4.5 known working, available [here](https://www.haskell.org/ghcup/))
+  * z3 solver (version 4.12.2 known working, available [here](https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-glibc-2.31.zip)),
+  * SymbiYosys OSS CAD Suite (version 2024-11-27 known working, available [here](https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2024-11-27/oss-cad-suite-linux-x64-20241127.tgz))
 
 If you have trouble meeting any of the dependencies, you can simply
 enter a docker shell:
