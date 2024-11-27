@@ -27,4 +27,6 @@ shell: build-docker
 .PHONY: clean
 clean:
 	cabal clean
-	rm -rf gen/*.v gen/*.smt2 gen/check/ gen/check_*
+	rm -rf gen/*.v gen/*.smt2
+	rm -rf gen/Correctness_* gen/ForwardProgress_*
+	rm -rf gen/Correctness/ gen/ForwardProgress/

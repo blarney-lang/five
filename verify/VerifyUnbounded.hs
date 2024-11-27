@@ -3,4 +3,6 @@ import Blarney.Five
 import Blarney.Backend.NewSMT
 
 main :: IO ()
-main = checkAuto Verbose makeVerifier
+main = do
+  checkAuto Verbose makeVerifier
+  checkAuto Verbose makeForwardProgressVerifier

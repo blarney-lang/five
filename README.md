@@ -8,7 +8,6 @@ microcontroller called
 demonstrates use of the pipeline in an actual processor core.  Five is
 written in [Blarney](https://github.com/blarney-lang/blarney). 
 
-
 ## Dependencies
 
 First, download the repo:
@@ -34,30 +33,32 @@ make shell
 
 The pipeline can be verified using both bounded and unbounded model checking, either via SymbiYosys or the z3 SMT solver.
 
-For bounded checking via SymbiYosys, Verilog can be generated as follows.
+Verilog and SMT for verification can be generated as follows.
 
 ```sh
-cabal run blarney-five-gen
+make gen
 ```
 
-The Verilog is written to the `gen/` directory and can be checked as follows.
+The outputs are written to the `gen/` directory and can be checked as follows.
 
 ```sh
 cd gen
-sby check.sby -f        # Verify the generated Verilog using SymbiYosys
+sby Correctness.sby -f       # Check using SymbiYosys
+sby ForwardProgress.sby -f   # Check using SymbiYosys
+z3 Correctness.smt2          # Check using z3
+z3 ForwardProgress.smt2      # Check using z3
 ```
 
 If z3 is in your `PATH` then the following command can be used.
 
 ```sh
-cabal run blarney-five-verify
+make verify
 ```
 
-For unbounded checking, which requires around ten hours to complete, use the
-command:
+For unbounded checking, which requires around ten hours to complete, the following command can be used.
 
 ```sh
-cabal run blarney-five-verify-unbounded
+make verify-unbounded
 ```
 
 ## Acknowledgements

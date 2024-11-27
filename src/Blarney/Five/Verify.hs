@@ -1,4 +1,7 @@
-module Blarney.Five.Verify (makeVerifier) where
+module Blarney.Five.Verify (
+    makeVerifier
+  , makeForwardProgressVerifier
+  ) where
 
 import Blarney
 import Blarney.Queue
@@ -32,9 +35,18 @@ data Instr = Instr {
 data MReq = MReq { val :: Bit XLen, hasResp :: Bit 1 }
   deriving (Generic, Bits)
 
+-- Which properties to check?
+data CheckerConfig =
+  CheckerConfig {
+    correctPC :: Bool
+  , correctInstr :: Bool
+  , correctOperands :: Bool
+  , forwardProgress :: Bool
+  }
+
 -- An "instruction set" that checks pipeline properties
-makeChecker :: Module (InstrSet XLen ILen Instr LogRegs MReq)
-makeChecker = do
+makeChecker :: CheckerConfig -> Module (InstrSet XLen ILen Instr LogRegs MReq)
+makeChecker conf = do
   -- Golden PC and register file
   goldenPC <- makeReg 0
   goldenRegs <- replicateM (2 ^ valueOf @LogRegs) (makeReg 0)
@@ -59,7 +71,8 @@ makeChecker = do
     , getSrcs = \i -> (i.rs1, i.rs2)
     , execute = \i s -> do
         -- Check raw instruction matches the PC
-        assert (i.raw .==. s.pc.val) "Instruction correct"
+        when conf.correctInstr do
+          assert (i.raw .==. s.pc.val) "Instruction correct"
         -- Optionally perform a branch
         let branchValid = i.canBranch .&&. var "branch_valid"
         let branchTarget = var "branch_target"
@@ -67,7 +80,7 @@ makeChecker = do
         -- Maintain golden PC and check against it
         goldenPC <== if branchValid then branchTarget
                        else goldenPC.val + 1
-        assert (s.pc.val .==. goldenPC.val) "PC correct"
+        when conf.correctPC do assert (s.pc.val .==. goldenPC.val) "PC correct"
         -- Issue memory request
         let mreq = MReq { val = var "mreq_val", hasResp = i.rd.valid }
         when i.isMemAccess do s.memReq <== mreq
@@ -79,11 +92,13 @@ makeChecker = do
             if i.isMemAccess then mreq.val else result
         -- Check operands against golden register file
         let check r x = r.valid .==>. (goldenRegs!r.val).val .==. x
-        assert (check i.rs1 (fst s.operands) .&&.
-                check i.rs2 (snd s.operands)) "Operands correct"
+        when conf.correctOperands do
+          assert (check i.rs1 (fst s.operands) .&&.
+                  check i.rs2 (snd s.operands)) "Operands correct"
 
         -- Check forward progress
-        assert (idleCount.val .<=. 10) "Forward progress"
+        when conf.forwardProgress do
+          assert (idleCount.val .<=. 10) "Forward progress"
         progress <== true
     , isMemAccess = \i -> i.isMemAccess
     , incPC = 1
@@ -116,20 +131,52 @@ makeMapFilterServer putMask peekMask p f = do
 -- Pipeline instantiation for verification
 makeVerifier :: Module ()
 makeVerifier = mdo
+  imem <- makeMapFilterServer (var "imem_put_mask")
+                              (var "imem_peek_mask")
+                              (const true) id
+  dmem <- makeMapFilterServer (var "dmem_put_mask")
+                              (var "dmem_peek_mask")
+                              (.hasResp) (.val)
+  iset <- makeChecker
+    CheckerConfig {
+      correctPC       = True
+    , correctInstr    = True
+    , correctOperands = True
+    , forwardProgress = False
+    }
+  branchPred <- makeArbitraryPredictor iset
+  regFile <- makeRegisterFile
+  makePipeline
+    PipelineParams {
+      iset       = iset
+    , imem       = imem
+    , dmem       = dmem
+    , regFile    = regFile
+    , branchPred = branchPred
+    }
+
+-- Pipeline instantiation for forward progress verification
+makeForwardProgressVerifier :: Module ()
+makeForwardProgressVerifier = mdo
   let maxExtraLatency = 1 :: Bit 2
   imask <- makeLowForAtMost maxExtraLatency "imem_peek_mask"
   dmask <- makeLowForAtMost maxExtraLatency "dmem_peek_mask"
   imem <- makeMapFilterServer true imask (const true) id
   dmem <- makeMapFilterServer true dmask (.hasResp) (.val)
   iset <- makeChecker
+    CheckerConfig {
+      correctPC       = False
+    , correctInstr    = False
+    , correctOperands = False
+    , forwardProgress = True
+    }
   branchPred <- makeArbitraryPredictor iset
   regFile <- makeRegisterFile
-  let params =
-        PipelineParams {
-          iset             = iset
-        , imem             = imem
-        , dmem             = dmem
-        , regFile          = regFile
-        , branchPred       = branchPred
-        }
-  makePipeline params
+  makePipeline
+    PipelineParams {
+      iset       = iset
+    , imem       = imem
+    , dmem       = dmem
+    , regFile    = regFile
+    , branchPred = branchPred
+    }

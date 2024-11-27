@@ -1,0 +1,16 @@
+[tasks]
+ForwardProgress
+
+[options]
+depth 50
+mode bmc
+
+[engines]
+smtbmc boolector
+
+[script]
+read -formal ForwardProgress.v
+ForwardProgress: prep -top ForwardProgress
+
+[files]
+ForwardProgress.v
