@@ -52,7 +52,7 @@ library
 
 executable blarney-five-gen
   import: blarney-five-common
-  main-is: GenSMT.hs
+  main-is: Gen.hs
   hs-source-dirs: verify
   build-depends: blarney-five
 

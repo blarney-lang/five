@@ -1,5 +1,5 @@
-.PHONY: smt-files
-smt-files:
+.PHONY: gen
+gen:
 	cabal run blarney-five-gen
 
 .PHONY: verify
@@ -23,4 +23,4 @@ shell: build-docker
 .PHONY: clean
 clean:
 	cabal clean
-	rm -rf SMT
+	rm -rf gen/*.v gen/*.smt gen/check/ gen/check_*

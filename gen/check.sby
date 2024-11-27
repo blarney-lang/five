@@ -1,0 +1,16 @@
+[tasks]
+Correctness
+
+[options]
+depth 10
+mode bmc
+
+[engines]
+smtbmc boolector
+
+[script]
+read -formal Correctness.v
+Correctness: prep -top Correctness
+
+[files]
+Correctness.v

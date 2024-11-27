@@ -44,19 +44,23 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | \
     BOOTSTRAP_HASKELL_NONINTERACTIVE=1 \
     BOOTSTRAP_HASKELL_GHC_VERSION=9.4.5 \
     BOOTSTRAP_HASKELL_CABAL_VERSION=3.6.2.0 \
-    BOOTSTRAP_HASKELL_INSTALL_STACK=1 \
-    BOOTSTRAP_HASKELL_INSTALL_HLS=1 \
+    BOOTSTRAP_HASKELL_INSTALL_STACK=0 \
+    BOOTSTRAP_HASKELL_INSTALL_HLS=0 \
     BOOTSTRAP_HASKELL_ADJUST_BASHRC=P sh
 
 # Install z3
 RUN wget https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-glibc-2.31.zip -P /home/dev-user
 RUN unzip /home/dev-user/z3-4.12.2-x64-glibc-2.31.zip -d /home/dev-user
 
+# Install SymbiYosys
+RUN wget https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2024-11-27/oss-cad-suite-linux-x64-20241127.tgz -P /home/dev-user
+RUN tar xzf /home/dev-user/oss-cad-suite-linux-x64-20241127.tgz -C /home/dev-user
+
 # Add environment variables
 RUN printf "\
 \nexport LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:\$LIBRARY_PATH \
 \n# Basic PATH setup \
-\nexport PATH=/workspace/scripts:/home/dev-user/.local/bin:/home/dev-user/.ghcup/bin:/home/dev-user/z3-4.12.2-x64-glibc-2.31/bin/:\$PATH \
+\nexport PATH=/workspace/scripts:/home/dev-user/.local/bin:/home/dev-user/.ghcup/bin:/home/dev-user/z3-4.12.2-x64-glibc-2.31/bin/:/home/dev-user/oss-cad-suite/bin:\$PATH \
 \n# Thread setup \
 \nexport nproc=\$(grep -c ^processor /proc/cpuinfo) \
 \n# Terminal color... \

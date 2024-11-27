@@ -1,4 +1,9 @@
-module Blarney.Five.Verify (genSMTScripts, verify, verifyUnbounded) where
+module Blarney.Five.Verify
+  ( genVerilog
+  , genSMTScripts
+  , verify
+  , verifyUnbounded
+  ) where
 
 import Data.Proxy
 
@@ -183,6 +188,11 @@ makeForwardProgressVerifier n = mdo
 -- (For forward progress checking)
 maxCyclesToRetire = 10
 
+-- Generate verilog for verification
+genVerilog :: IO ()
+genVerilog = do
+  writeVerilogModule makeCorrectnessVerifier "Correctness" "gen"
+
 -- Generate SMT scripts for verification
 genSMTScripts :: IO ()
 genSMTScripts = do
@@ -190,12 +200,12 @@ genSMTScripts = do
   let conf = dfltVerifyConf {
                verifyConfMode = Bounded (fixedDepth d)
              }
-  writeSMTScript conf makeCorrectnessVerifier "Correctness" "SMT"
+  writeSMTScript conf makeCorrectnessVerifier "Correctness" "gen"
 
   let d = 2 * maxCyclesToRetire + 2
   let conf = dfltVerifyConf { verifyConfMode = Bounded (fixedDepth d) }
   writeSMTScript conf (makeForwardProgressVerifier maxCyclesToRetire)
-                 "ForwardProgress" "SMT"
+                 "ForwardProgress" "gen"
 
 -- Lauch SMT solver and verify. This is the recommended flow (it's more
 -- efficient) but not the default as it assumes an SMT solver is available.

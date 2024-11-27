@@ -17,9 +17,10 @@ First, download the repo:
 git clone --recursive https://github.com/blarney-lang/five
 ```
 
-We'll need the z3 solver (version 4.12.2 known working) and GHC (version 9.4.5 known working). Version 4.12.2 of z3 can be found in this [zip
+We'll need the z3 solver (version 4.12.2 known working), GHC (version 9.4.5 known working), and SymbiYosys OSS CAD Suite (version 2024-11-27 known working). Version 4.12.2 of z3 can be found in this [zip
 file](https://github.com/Z3Prover/z3/releases/download/z3-4.12.2/z3-4.12.2-x64-glibc-2.31.zip).
 For GHC 9.4.5, [ghcup](https://www.haskell.org/ghcup/) can be used.
+Version 2024-11-27 of SymbiYosys OSS CAD suite can be found in this [tar file](https://github.com/YosysHQ/oss-cad-suite-build/releases/download/2024-11-27/oss-cad-suite-linux-x64-20241127.tgz).
 
 If you have trouble meeting any of the dependencies, you can simply
 enter a docker shell:
@@ -30,20 +31,24 @@ make shell
 
 ## Usage
 
-The pipeline can be verified using both bounded and unbounded model checking on top of the z3 solver.
+The pipeline can be verified using both bounded and unbounded model checking, either using the z3 SMT solver or SymbiYosys.
 
-For bounded checking, SMT formulae can be generated as follows.
+For bounded checking, Verilog and SMT can be generated as follows.
 
 ```sh
 cabal run blarney-five-gen
 ```
 
-The formulae are written to the `SMT/` directory. Each `.smt` file can be
-passed to the z3 solver, and should evaluate to `unsat`, i.e. no
-counterexamples are found.
+The outputs are written to the `gen/` directory and can be checked as follows
 
-If z3 is in your `PATH` then we recommend using the following command, which
-verifies the properties directly and incrementally.
+```sh
+cd gen
+z3 Correctness.smt      # Verify the SMT using z3
+sby check.sby -f        # Verify the Verilog using SymbiYosys
+```
+
+If z3 is in your `PATH` then the following command can be used to verify the
+SMT formulae directly and incrementally.
 
 ```sh
 cabal run blarney-five-verify
