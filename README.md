@@ -1,8 +1,8 @@
 # Five
 
 Five is a standalone implementation of the classic five-stage
-processor pipeline that can be understood and verified independently
-of any particular instruction set. Separately, we provide a RISC-V
+processor pipeline that can be understood and formally verified independently
+of the instruction-set implementation. Separately, we provide a RISC-V
 microcontroller called
 [FiveAlive](https://github.com/blarney-lang/five-alive) that
 demonstrates use of the pipeline in an actual processor core.  Five is
